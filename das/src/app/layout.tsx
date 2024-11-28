@@ -1,8 +1,14 @@
 import './globals.css'
 import { Inter } from 'next/font/google'
 import { Toaster } from 'react-hot-toast'
+import { Navigation } from '@/components/navigation'
 
 const inter = Inter({ subsets: ['latin'] })
+
+export const metadata = {
+  title: 'Document Automation System',
+  description: 'Streamline your document workflows with automated template processing',
+}
 
 export default function RootLayout({
   children,
@@ -12,21 +18,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <main className="min-h-screen bg-gray-50">
-          <nav className="bg-white shadow-sm">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex justify-between h-16">
-                <div className="flex">
-                  <div className="flex-shrink-0 flex items-center">
-                    <h1 className="text-xl font-bold">Doc Automation</h1>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </nav>
-          {children}
-          <Toaster />
-        </main>
+        <div className="min-h-screen bg-gray-50">
+          <Navigation />
+          <main className="pt-16">
+            {children}
+          </main>
+          <Toaster position="top-right" />
+        </div>
       </body>
     </html>
   )
