@@ -1,44 +1,44 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { Template } from '@prisma/client'
-import toast from 'react-hot-toast'
+import { useState } from "react";
+import { Template } from "@prisma/client";
+import toast from "react-hot-toast";
 
 interface TemplateDetailFormProps {
-  template: Template
+  template: Template;
 }
 
 export function TemplateDetailForm({ template }: TemplateDetailFormProps) {
-  const [isEditing, setIsEditing] = useState(false)
+  const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     name: template.name,
-    description: template.description || '',
+    description: template.description || "",
     category: template.category,
-  })
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
+    e.preventDefault();
+
     try {
       const response = await fetch(`/api/templates/${template.id}`, {
-        method: 'PATCH',
+        method: "PATCH",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(formData),
-      })
+      });
 
       if (!response.ok) {
-        throw new Error('Failed to update template')
+        throw new Error("Failed to update template");
       }
 
-      toast.success('Template updated successfully')
-      setIsEditing(false)
+      toast.success("Template updated successfully");
+      setIsEditing(false);
     } catch (error) {
-      console.error('Update error:', error)
-      toast.error('Failed to update template')
+      console.error("Update error:", error);
+      toast.error("Failed to update template");
     }
-  }
+  };
 
   return (
     <div className="p-6">
@@ -53,7 +53,9 @@ export function TemplateDetailForm({ template }: TemplateDetailFormProps) {
               <input
                 type="text"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
               />
             ) : (
@@ -69,13 +71,15 @@ export function TemplateDetailForm({ template }: TemplateDetailFormProps) {
             {isEditing ? (
               <textarea
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
                 rows={3}
                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
               />
             ) : (
               <p className="mt-1 text-sm text-gray-900">
-                {template.description || 'No description provided'}
+                {template.description || "No description provided"}
               </p>
             )}
           </div>
@@ -89,7 +93,9 @@ export function TemplateDetailForm({ template }: TemplateDetailFormProps) {
               <input
                 type="text"
                 value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, category: e.target.value })
+                }
                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
               />
             ) : (
@@ -99,7 +105,9 @@ export function TemplateDetailForm({ template }: TemplateDetailFormProps) {
 
           {/* Template Variables Section */}
           <div>
-            <h3 className="text-sm font-medium text-gray-700">Template Variables</h3>
+            <h3 className="text-sm font-medium text-gray-700">
+              Template Variables
+            </h3>
             <div className="mt-2 flex flex-wrap gap-2">
               {(template.variables as string[]).map((variable, index) => (
                 <span
@@ -119,12 +127,12 @@ export function TemplateDetailForm({ template }: TemplateDetailFormProps) {
                 <button
                   type="button"
                   onClick={() => {
-                    setIsEditing(false)
+                    setIsEditing(false);
                     setFormData({
                       name: template.name,
-                      description: template.description || '',
+                      description: template.description || "",
                       category: template.category,
-                    })
+                    });
                   }}
                   className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
@@ -150,5 +158,5 @@ export function TemplateDetailForm({ template }: TemplateDetailFormProps) {
         </div>
       </form>
     </div>
-  )
+  );
 }

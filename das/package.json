@@ -6,14 +6,18 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "db:seed": "ts-node --transpile-only prisma/seed.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.4",
     "@prisma/client": "^5.22.0",
     "@tanstack/react-table": "^8.20.5",
     "@uploadthing/react": "^7.1.1",
-    "docxtemplater": "^3.54.0",
+    "angular-expressions": "^1.4.2",
+    "docxtemplater": "^3.54.1",
+    "lodash": "^4.17.21",
+    "lucide-react": "^0.462.0",
     "next": "15.0.3",
     "next-auth": "^5.0.0-beta.25",
     "pizzip": "^3.1.7",
@@ -21,16 +25,19 @@
     "react-dom": "^18.3.1",
     "react-dropzone": "^14.3.5",
     "react-hot-toast": "^2.4.1",
+    "ts-node": "^10.9.2",
     "uploadthing": "^7.3.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@faker-js/faker": "^9.2.0",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "eslint": "^8",
     "eslint-config-next": "15.0.3",
     "postcss": "^8",
+    "prettier": "3.4.1",
     "prisma": "^5.22.0",
     "tailwindcss": "^3.4.1",
     "typescript": "^5"

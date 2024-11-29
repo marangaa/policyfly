@@ -1,48 +1,50 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import Link from 'next/link'
-import { Template } from '@prisma/client'
+import { useState } from "react";
+import Link from "next/link";
+import { Template } from "@prisma/client";
 
 interface TemplatesTableProps {
-  templates: Template[]
+  templates: Template[];
 }
 
 export function TemplatesTable({ templates }: TemplatesTableProps) {
-  const [searchTerm, setSearchTerm] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
 
   // Get unique categories for filter dropdown
-  const categories = ['all', ...new Set(templates.map(t => t.category))]
+  const categories = ["all", ...new Set(templates.map((t) => t.category))];
 
   // Filter templates based on search and category
-  const filteredTemplates = templates.filter(template => {
-    const matchesSearch = template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         template.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesCategory = selectedCategory === 'all' || template.category === selectedCategory
-    return matchesSearch && matchesCategory
-  })
+  const filteredTemplates = templates.filter((template) => {
+    const matchesSearch =
+      template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      template.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory =
+      selectedCategory === "all" || template.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
 
-    async function handleDeleteTemplate(id: string): Promise<void> {
-        if (confirm('Are you sure you want to delete this template?')) {
-            try {
-                const response = await fetch(`/api/templates/${id}`, {
-                    method: 'DELETE',
-                });
-                if (!response.ok) {
-                    throw new Error('Failed to delete the template');
-                }
-                // Optionally, you can update the state to remove the deleted template from the list
-                // setTemplates(prevTemplates => prevTemplates.filter(template => template.id !== id));
-                alert('Template deleted successfully');
-                // Optionally, you can refresh the page or navigate to another page
-                // window.location.reload();
-            } catch (error) {
-                console.error('Error deleting template:', error);
-                alert('An error occurred while deleting the template');
-            }
+  async function handleDeleteTemplate(id: string): Promise<void> {
+    if (confirm("Are you sure you want to delete this template?")) {
+      try {
+        const response = await fetch(`/api/templates/${id}`, {
+          method: "DELETE",
+        });
+        if (!response.ok) {
+          throw new Error("Failed to delete the template");
         }
+        // Optionally, you can update the state to remove the deleted template from the list
+        // setTemplates(prevTemplates => prevTemplates.filter(template => template.id !== id));
+        alert("Template deleted successfully");
+        // Optionally, you can refresh the page or navigate to another page
+        // window.location.reload();
+      } catch (error) {
+        console.error("Error deleting template:", error);
+        alert("An error occurred while deleting the template");
+      }
     }
+  }
 
   return (
     <div className="bg-white shadow rounded-lg">
@@ -64,7 +66,7 @@ export function TemplatesTable({ templates }: TemplatesTableProps) {
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
             >
-              {categories.map(category => (
+              {categories.map((category) => (
                 <option key={category} value={category}>
                   {category.charAt(0).toUpperCase() + category.slice(1)}
                 </option>
@@ -100,14 +102,16 @@ export function TemplatesTable({ templates }: TemplatesTableProps) {
             {filteredTemplates.map((template) => (
               <tr key={template.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <Link 
+                  <Link
                     href={`/templates/${template.id}`}
                     className="text-blue-600 hover:text-blue-800"
                   >
                     {template.name}
                   </Link>
                   {template.description && (
-                    <p className="text-sm text-gray-500">{template.description}</p>
+                    <p className="text-sm text-gray-500">
+                      {template.description}
+                    </p>
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -117,14 +121,16 @@ export function TemplatesTable({ templates }: TemplatesTableProps) {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex flex-wrap gap-1">
-                    {(template.variables as string[]).slice(0, 3).map((variable, i) => (
-                      <span 
-                        key={i}
-                        className="px-2 py-1 text-xs rounded-md bg-gray-100"
-                      >
-                        {variable}
-                      </span>
-                    ))}
+                    {(template.variables as string[])
+                      .slice(0, 3)
+                      .map((variable, i) => (
+                        <span
+                          key={i}
+                          className="px-2 py-1 text-xs rounded-md bg-gray-100"
+                        >
+                          {variable}
+                        </span>
+                      ))}
                     {(template.variables as string[]).length > 3 && (
                       <span className="px-2 py-1 text-xs rounded-md bg-gray-100">
                         +{(template.variables as string[]).length - 3} more
@@ -163,5 +169,5 @@ export function TemplatesTable({ templates }: TemplatesTableProps) {
         </table>
       </div>
     </div>
-  )
+  );
 }

@@ -1,4 +1,4 @@
-import { TemplateUploadForm } from './template-upload-form'
+import { TemplateUploadForm } from "./template-upload-form";
 
 export default function UploadTemplatePage() {
   return (
@@ -8,5 +8,5 @@ export default function UploadTemplatePage() {
         <TemplateUploadForm />
       </div>
     </div>
-  )
+  );
 }

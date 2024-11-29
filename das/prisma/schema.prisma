@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -14,24 +8,68 @@ generator client {
 }
 
 model Template {
-  id          String   @id @default(cuid())
+  id          String     @id @default(cuid())
   name        String
   description String?
   category    String
-  filePath    String   // Path to template file in storage
-  variables   Json     // Array of variables found in template
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  filePath    String     
+  variables   Json       
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
   documents   Document[]
 }
 
 model Document {
   id         String   @id @default(cuid())
   name       String
-  filePath   String   // Path to generated document
+  filePath   String   
   template   Template @relation(fields: [templateId], references: [id])
   templateId String
-  data       Json     // Data used to generate document
+  data       Json     
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  client     Client?  @relation(fields: [clientId], references: [id])
+  clientId   String?
+}
+
+model Client {
+  id           String     @id @default(cuid())
+  fullName     String
+  dateOfBirth  DateTime
+  email        String     @unique
+  phoneNumber  String
+  documents    Document[]
+  addresses    Address[]
+  policies     Policy[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model Address {
+  id        String   @id @default(cuid())
+  street    String
+  city      String
+  state     String
+  zipCode   String
+  type      String   
+  isDefault Boolean  @default(false)
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Policy {
+  id              String   @id @default(cuid())
+  policyNumber    String   @unique
+  type            String   
+  issueDate       DateTime 
+  effectiveDate   DateTime 
+  expirationDate  DateTime 
+  coverageDetails Json     
+  status          String   
+  client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientId        String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }

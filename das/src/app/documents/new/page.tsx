@@ -1,29 +1,28 @@
-import { prisma } from '@/lib/prisma'
-import { DocumentGenerationForm } from './document-generation-form'
-import { redirect } from 'next/navigation'
+import { prisma } from "@/lib/prisma";
+import { DocumentGenerationForm } from "./document-generation-form";
+import { redirect } from "next/navigation";
 
-// This page handles both template selection and document generation
 export default async function NewDocumentPage({
   searchParams,
 }: {
-  searchParams: { template?: string }
+  searchParams: { template?: string };
 }) {
   // Fetch all templates for the selection dropdown
   const templates = await prisma.template.findMany({
-    orderBy: { name: 'asc' },
-  })
+    orderBy: { name: "asc" },
+  });
 
   if (templates.length === 0) {
     // If no templates exist, redirect to template upload
-    redirect('/templates/upload')
+    redirect("/templates/upload");
   }
 
   // If a template ID is provided in the URL, fetch its details
-  let selectedTemplate = null
+  let selectedTemplate = null;
   if (searchParams.template) {
     selectedTemplate = await prisma.template.findUnique({
-      where: { id: searchParams.template }
-    })
+      where: { id: searchParams.template },
+    });
   }
 
   return (
@@ -41,12 +40,12 @@ export default async function NewDocumentPage({
         </div>
 
         <div className="mt-6">
-          <DocumentGenerationForm 
-            templates={templates} 
+          <DocumentGenerationForm
+            templates={templates}
             initialTemplate={selectedTemplate}
           />
         </div>
       </div>
     </div>
-  )
+  );
 }

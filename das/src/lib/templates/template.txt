@@ -1,0 +1,91 @@
+
+INSURANCE QUOTE TEMPLATE
+
+COMPANY INFORMATION
+------------------
+Company Name: {company.name}
+License Number: {company.license}
+Address: {company.address}
+Phone: {company.phone}
+Email: {company.email}
+Website: {company.website}
+
+QUOTE DETAILS
+------------
+Reference Number: {quote.reference}
+Date Generated: {quote.dateGenerated}
+Valid Until: {quote.validUntil}
+Policy Type: {policy.type}
+
+AGENT INFORMATION
+---------------
+Name: {agent.name}
+License Number: {agent.license}
+Phone: {agent.phone}
+Email: {agent.email}
+
+CLIENT INFORMATION
+----------------
+Full Name: {client.name}
+Date of Birth: {client.dob}
+SSN: {client.ssn}
+Address: {client.address}
+Phone: {client.phone}
+Email: {client.email}
+Occupation: {client.occupation}
+Current Insurance: {client.currentInsurer}
+
+COVERAGE DETAILS
+--------------
+{#coverages}
+Coverage Type: {type}
+Coverage Amount: {amount}
+Deductible: {deductible}
+Premium: {premium}
+{/coverages}
+
+RISK ASSESSMENT
+-------------
+Risk Level: {risk.level}
+Risk Factors:
+{#risk.factors}
+- {.}
+{/risk.factors}
+
+PREMIUM CALCULATION
+-----------------
+Base Premium: {premium.base}
+
+Discounts:
+{#premium.discounts}
+- {name}: {amount}
+{/premium.discounts}
+
+Additional Fees:
+{#premium.fees}
+- {name}: {amount}
+{/premium.fees}
+
+Total Annual Premium: {premium.total}
+
+PAYMENT OPTIONS
+-------------
+{#paymentOptions}
+Payment Plan: {frequency}
+Amount: {amount}
+Due Date: {dueDate}
+{/paymentOptions}
+
+TERMS AND CONDITIONS
+------------------
+{#terms}
+{.}
+{/terms}
+
+AUTHORIZATION
+-----------
+By signing below, I acknowledge that I have reviewed and understand the coverage details, premium calculation, and terms and conditions outlined in this quote.
+
+Client Signature: ___________________ Date: ___________
+
+Agent Signature: ___________________ Date: ___________
