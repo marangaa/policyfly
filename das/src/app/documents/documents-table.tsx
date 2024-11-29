@@ -3,6 +3,17 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import { 
+  Download, 
+  RefreshCw, 
+  Trash2, 
+  ChevronLeft, 
+  ChevronRight,
+  FileText,
+  Calendar,
+  X,
+  LayoutTemplate
+} from "lucide-react";
 
 interface DocumentWithTemplate {
   id: string;
@@ -29,17 +40,12 @@ export function DocumentsTable({
   const router = useRouter();
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [selectedDocument, setSelectedDocument] =
-    useState<DocumentWithTemplate | null>(null);
+  const [selectedDocument, setSelectedDocument] = useState<DocumentWithTemplate | null>(null);
 
-  // Handle document regeneration
   const handleRegenerate = async (document: DocumentWithTemplate) => {
     setRegeneratingId(document.id);
     try {
-      // Navigate to new document page with prefilled data
-      router.push(
-        `/documents/new?template=${document.template.id}&prefill=${document.id}`,
-      );
+      router.push(`/documents/new?template=${document.template.id}&prefill=${document.id}`);
     } catch (error) {
       console.error("Regeneration error:", error);
       toast.error("Failed to regenerate document");
@@ -48,7 +54,6 @@ export function DocumentsTable({
     }
   };
 
-  // Handle document deletion
   const handleDelete = async (documentId: string) => {
     if (!confirm("Are you sure you want to delete this document?")) return;
 
@@ -58,12 +63,10 @@ export function DocumentsTable({
         method: "DELETE",
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to delete document");
-      }
+      if (!response.ok) throw new Error("Failed to delete document");
 
       toast.success("Document deleted successfully");
-      router.refresh(); // Refresh the page to update the list
+      router.refresh();
     } catch (error) {
       console.error("Deletion error:", error);
       toast.error("Failed to delete document");
@@ -72,73 +75,89 @@ export function DocumentsTable({
     }
   };
 
-  // Handle pagination
   const handlePageChange = (newPage: number) => {
     router.push(`/documents?page=${newPage}`);
   };
 
   return (
-    <div className="bg-white shadow-sm rounded-lg">
-      {/* Documents Table */}
+    <div className="bg-white shadow-lg rounded-xl border border-gray-100">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Document Name
+          <thead>
+            <tr className="bg-gray-50">
+              <th className="px-6 py-4 text-left">
+                <span className="flex items-center gap-2 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  <FileText className="w-4 h-4" />
+                  Document Name
+                </span>
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Template
+              <th className="px-6 py-4 text-left">
+                <span className="flex items-center gap-2 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  <LayoutTemplate className="w-4 h-4" />
+                  Template
+                </span>
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Created
+              <th className="px-6 py-4 text-left">
+                <span className="flex items-center gap-2 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  <Calendar className="w-4 h-4" />
+                  Created
+                </span>
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="divide-y divide-gray-200">
             {documents.map((document) => (
-              <tr key={document.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
+              <tr key={document.id} className="hover:bg-gray-50 transition-colors">
+                <td className="px-6 py-4">
                   <button
                     onClick={() => setSelectedDocument(document)}
-                    className="text-blue-600 hover:text-blue-900"
+                    className="text-base font-medium text-blue-600 hover:text-blue-800 transition-colors"
                   >
                     {document.name}
                   </button>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {document.template.name}
+                <td className="px-6 py-4">
+                  <span className="text-sm text-gray-600">{document.template.name}</span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {new Date(document.createdAt).toLocaleString()}
+                <td className="px-6 py-4">
+                  <span className="text-sm text-gray-600">
+                    {new Date(document.createdAt).toLocaleDateString(undefined, {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <div className="flex justify-end space-x-3">
+                <td className="px-6 py-4">
+                  <div className="flex justify-end gap-4">
                     <a
                       href={`/api/documents/${document.id}/download`}
-                      className="text-blue-600 hover:text-blue-900"
+                      className="flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
                       download
                     >
-                      Download
+                      <Download className="w-4 h-4" />
+                      <span>Download</span>
                     </a>
                     <button
                       onClick={() => handleRegenerate(document)}
-                      className="text-green-600 hover:text-green-900"
                       disabled={regeneratingId === document.id}
+                      className="flex items-center gap-1 text-sm font-medium text-emerald-600 hover:text-emerald-800 transition-colors disabled:opacity-50"
                     >
-                      {regeneratingId === document.id
-                        ? "Regenerating..."
-                        : "Regenerate"}
+                      <RefreshCw className={`w-4 h-4 ${regeneratingId === document.id ? 'animate-spin' : ''}`} />
+                      <span>{regeneratingId === document.id ? "Regenerating..." : "Regenerate"}</span>
                     </button>
                     <button
                       onClick={() => handleDelete(document.id)}
-                      className="text-red-600 hover:text-red-900"
                       disabled={deletingId === document.id}
+                      className="flex items-center gap-1 text-sm font-medium text-red-600 hover:text-red-800 transition-colors disabled:opacity-50"
                     >
-                      {deletingId === document.id ? "Deleting..." : "Delete"}
+                      <Trash2 className="w-4 h-4" />
+                      <span>{deletingId === document.id ? "Deleting..." : "Delete"}</span>
                     </button>
                   </div>
                 </td>
@@ -148,102 +167,66 @@ export function DocumentsTable({
         </table>
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
-        <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-          <div className="flex-1 flex justify-between sm:hidden">
-            <button
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-            >
-              Previous
-            </button>
-            <button
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-            >
-              Next
-            </button>
-          </div>
-          <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm text-gray-700">
-                Showing page <span className="font-medium">{currentPage}</span>{" "}
-                of <span className="font-medium">{totalPages}</span>
-              </p>
-            </div>
-            <div>
-              <nav
-                className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
-                aria-label="Pagination"
+        <div className="px-6 py-4 border-t border-gray-200">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-700">
+              Showing page <span className="font-semibold">{currentPage}</span> of{" "}
+              <span className="font-semibold">{totalPages}</span>
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
               >
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                  (page) => (
-                    <button
-                      key={page}
-                      onClick={() => handlePageChange(page)}
-                      className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                        page === currentPage
-                          ? "z-10 bg-blue-50 border-blue-500 text-blue-600"
-                          : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  ),
-                )}
-              </nav>
+                <ChevronLeft className="w-4 h-4" />
+                Previous
+              </button>
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              >
+                Next
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Document Preview Modal */}
       {selectedDocument && (
-        <div
-          className="fixed inset-0 z-50 overflow-y-auto"
-          aria-labelledby="modal-title"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div
-              className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
-              aria-hidden="true"
-            ></div>
-            <span
-              className="hidden sm:inline-block sm:align-middle sm:h-screen"
-              aria-hidden="true"
-            >
-              &#8203;
-            </span>
-            <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
-              <div>
-                <div className="mt-3 text-center sm:mt-5">
-                  <h3
-                    className="text-lg leading-6 font-medium text-gray-900"
-                    id="modal-title"
-                  >
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-500 bg-opacity-75 backdrop-blur-sm">
+          <div className="flex items-center justify-center min-h-screen p-4">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-semibold text-gray-900">
                     Document Preview
                   </h3>
-                  <div className="mt-2">
-                    <iframe
-                      src={`/api/documents/${selectedDocument.id}/preview`}
-                      className="w-full h-96 border border-gray-200 rounded"
-                    />
-                  </div>
+                  <button
+                    onClick={() => setSelectedDocument(null)}
+                    className="text-gray-500 hover:text-gray-700 transition-colors"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
                 </div>
-              </div>
-              <div className="mt-5 sm:mt-6">
-                <button
-                  type="button"
-                  className="inline-flex justify-center w-full rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:text-sm"
-                  onClick={() => setSelectedDocument(null)}
-                >
-                  Close Preview
-                </button>
+                <div className="mt-4">
+                  <iframe
+                    src={`/api/documents/${selectedDocument.id}/preview`}
+                    className="w-full h-[32rem] border border-gray-200 rounded-lg"
+                  />
+                </div>
+                <div className="mt-6 flex justify-end">
+                  <button
+                    type="button"
+                    className="px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                    onClick={() => setSelectedDocument(null)}
+                  >
+                    Close Preview
+                  </button>
+                </div>
               </div>
             </div>
           </div>

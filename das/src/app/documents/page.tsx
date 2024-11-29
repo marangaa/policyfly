@@ -1,7 +1,7 @@
-// app/documents/page.tsx
 import { prisma } from "@/lib/prisma";
 import { DocumentsTable } from "./documents-table";
 import Link from "next/link";
+import { Plus, FileText } from "lucide-react"; // Import icons for enhanced visual elements
 
 export default async function DocumentsPage({
   searchParams,
@@ -11,11 +11,8 @@ export default async function DocumentsPage({
   const page = Number(searchParams.page) || 1;
   const pageSize = 10;
 
-  // Create the database query
   const baseQuery = {
-    where: searchParams.templateId
-      ? { templateId: searchParams.templateId }
-      : {},
+    where: searchParams.templateId ? { templateId: searchParams.templateId } : {},
     include: {
       template: {
         select: {
@@ -27,7 +24,6 @@ export default async function DocumentsPage({
     orderBy: { createdAt: "desc" as const },
   };
 
-  // Execute queries in parallel for better performance
   const [documents, totalCount] = await Promise.all([
     prisma.document.findMany({
       ...baseQuery,
@@ -41,23 +37,24 @@ export default async function DocumentsPage({
   ]);
 
   return (
-    <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-      <div className="px-4 sm:px-0">
-        <div className="sm:flex sm:items-center">
-          <div className="sm:flex-auto">
-            <h1 className="text-2xl font-semibold text-gray-900">
+    <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      <div className="space-y-8">
+        <div className="sm:flex sm:items-center sm:justify-between">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl">
               Generated Documents
             </h1>
-            <p className="mt-2 text-sm text-gray-700">
+            <p className="mt-3 text-lg leading-relaxed text-gray-600 max-w-3xl">
               A list of all documents generated from your templates. You can
               preview, download, or regenerate any document.
             </p>
           </div>
-          <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
+          <div className="mt-4 sm:mt-0 sm:ml-16 flex-shrink-0">
             <Link
               href="/documents/new"
-              className="inline-flex items-center justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:w-auto"
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-base font-semibold text-white shadow-lg transition-all duration-200 hover:bg-blue-700 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             >
+              <Plus className="w-5 h-5" />
               Generate New Document
             </Link>
           </div>
@@ -65,44 +62,41 @@ export default async function DocumentsPage({
 
         <div className="mt-8">
           {documents.length === 0 ? (
-            <div className="text-center py-12 bg-white rounded-lg shadow">
-              <svg
-                className="mx-auto h-12 w-12 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-              <h3 className="mt-2 text-sm font-medium text-gray-900">
-                No documents
-              </h3>
-              <p className="mt-1 text-sm text-gray-500">
-                Get started by generating your first document.
-              </p>
-              <div className="mt-6">
-                <Link
-                  href="/documents/new"
-                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                >
-                  Generate New Document
-                </Link>
+            <div className="relative text-center py-16 bg-white rounded-2xl shadow-sm border border-gray-100">
+              <div className="flex flex-col items-center gap-4">
+                <div className="rounded-full bg-blue-50 p-4">
+                  <FileText className="w-8 h-8 text-blue-600" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-semibold text-gray-900">
+                    No documents yet
+                  </h3>
+                  <p className="text-base text-gray-600 max-w-sm mx-auto">
+                    Get started by generating your first document using our template system.
+                  </p>
+                </div>
+                <div className="mt-6">
+                  <Link
+                    href="/documents/new"
+                    className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-base font-semibold text-white shadow-lg transition-all duration-200 hover:bg-blue-700 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  >
+                    <Plus className="w-5 h-5" />
+                    Generate New Document
+                  </Link>
+                </div>
               </div>
             </div>
           ) : (
-            <DocumentsTable
-              documents={documents.map((doc) => ({
-                ...doc,
-                data: doc.data as Record<string, any>,
-              }))}
-              totalPages={Math.ceil(totalCount / pageSize)}
-              currentPage={page}
-            />
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
+              <DocumentsTable
+                documents={documents.map((doc) => ({
+                  ...doc,
+                  data: doc.data as Record<string, any>,
+                }))}
+                totalPages={Math.ceil(totalCount / pageSize)}
+                currentPage={page}
+              />
+            </div>
           )}
         </div>
       </div>
