@@ -3,13 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { promises as fs } from "fs";
 import path from "path";
 
-// Define the params interface
-interface RouteParams {
-  params: {
-    id: string;
-  };
-}
-
 class DocumentNotFoundError extends Error {
   constructor(id: string) {
     super(`Document with id ${id} not found`);
@@ -33,13 +26,14 @@ async function getDocumentBuffer(filePath: string) {
   return await fs.readFile(fullPath);
 }
 
-// Update the GET function with proper types
+// Updated type signature for Next.js App Router
 export async function GET(
-  req: NextRequest,
-  { params }: RouteParams
-): Promise<NextResponse> {
+  request: NextRequest,
+  { params }: { params: Record<string, string | string[]> }
+) {
   try {
-    const document = await getDocument(params.id);
+    const id = params.id as string;
+    const document = await getDocument(id);
     const buffer = await getDocumentBuffer(document.filePath);
 
     return new NextResponse(buffer, {
