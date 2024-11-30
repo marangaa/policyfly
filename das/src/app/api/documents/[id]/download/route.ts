@@ -3,47 +3,53 @@ import { prisma } from "@/lib/prisma";
 import { promises as fs } from "fs";
 import path from "path";
 
+class DocumentNotFoundError extends Error {
+  constructor(id: string) {
+    super(`Document with id ${id} not found`);
+  }
+}
+
+async function getDocument(id: string) {
+  const document = await prisma.document.findUnique({
+    where: { id },
+  });
+  
+  if (!document) {
+    throw new DocumentNotFoundError(id);
+  }
+  
+  return document;
+}
+
+async function getDocumentBuffer(filePath: string) {
+  const fullPath = path.join(process.cwd(), "uploads", "documents", filePath);
+  return await fs.readFile(fullPath);
+}
+
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: { id: string } }
 ) {
   try {
-    const documentId = params.id;
+    const document = await getDocument(params.id);
+    const buffer = await getDocumentBuffer(document.filePath);
 
-    // Fetch document details
-    const document = await prisma.document.findUnique({
-      where: { id: documentId },
-    });
-
-    if (!document) {
-      return NextResponse.json(
-        { error: "Document not found" },
-        { status: 404 },
-      );
-    }
-
-    // Read the document file
-    const filePath = path.join(
-      process.cwd(),
-      "uploads",
-      "documents",
-      document.filePath,
-    );
-    const buffer = await fs.readFile(filePath);
-
-    // Create response with appropriate headers
     return new NextResponse(buffer, {
       headers: {
-        "Content-Type":
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "Content-Disposition": `attachment; filename="${document.name}"`,
       },
     });
   } catch (error) {
     console.error("Document download error:", error);
+    
+    if (error instanceof DocumentNotFoundError) {
+      return NextResponse.json({ error: error.message }, { status: 404 });
+    }
+    
     return NextResponse.json(
       { error: "Failed to download document" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
