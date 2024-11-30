@@ -67,9 +67,9 @@ model Policy {
   issueDate       DateTime 
   effectiveDate   DateTime 
   expirationDate  DateTime 
-  coverageDetails Json     
-  premiumDetails  Json     
-  status          String   
+  coverageDetails Json      // Strictly typed through application code
+  premiumDetails  Json      // Strictly typed through application code
+  status          String    @default("active")
   client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
   clientId        String
   underwritingStatus String?  

@@ -4,22 +4,25 @@ import { prisma } from '@/lib/prisma'
 export default async function NewDocumentPage({
   searchParams,
 }: {
-  searchParams: { template?: string }
+  searchParams: { [key: string]: string | string[] | undefined }
 }) {
-  // Fetch all templates
   const templates = await prisma.template.findMany({
     orderBy: { name: 'asc' }
-  });
+  })
 
-  // Get initial template if specified in URL
-  const initialTemplate = searchParams.template ? 
-    templates.find(t => t.id === searchParams.template) || null : 
-    null;
+  let initialTemplate = null
+  const templateId = searchParams?.template as string | undefined;
+
+  if (templateId) {
+    initialTemplate = await prisma.template.findUnique({
+      where: { id: templateId }
+    })
+  }
 
   return (
     <DocumentGenerationForm 
       templates={templates} 
-      initialTemplate={initialTemplate} 
+      initialTemplate={initialTemplate}
     />
-  );
+  )
 }

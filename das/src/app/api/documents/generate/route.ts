@@ -27,11 +27,15 @@ function angularParser(tag: string) {
   }
 }
 
-
 // Helper to format dates consistently
 
+function parseCurrency(value: string | number): number {
+  if (typeof value === 'number') return value;
+  return Number(value.replace(/[^0-9.-]+/g, ''));
+}
+
 function formatCurrency(value: string | number): string {
-  const num = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]+/g, '')) : value;
+  const num = typeof value === 'string' ? parseCurrency(value) : value;
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
@@ -59,7 +63,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Template ID and Client ID are required' }, { status: 400 });
     }
 
-    // Fetch all required data
+    // Fetch all required data with specific policy type
     const [template, client] = await Promise.all([
       prisma.template.findUnique({ where: { id: templateId } }),
       prisma.client.findUnique({
@@ -67,9 +71,15 @@ export async function POST(request: Request) {
         include: {
           addresses: { where: { isDefault: true } },
           policies: {
-            where: { type: variables.policy_type, status: 'active' },
+            where: { 
+              type: variables.policy_type,
+              status: { in: ['active', 'ACTIVE'] }
+            },
             orderBy: { effectiveDate: 'desc' },
-            take: 1
+            take: 1,
+            include: {
+              // Add any additional relations you need
+            }
           }
         }
       })
@@ -83,7 +93,9 @@ export async function POST(request: Request) {
     const activePolicy = client.policies[0];
 
     if (!activePolicy) {
-      return NextResponse.json({ error: 'No active policy found' }, { status: 404 });
+      return NextResponse.json({ 
+        error: `No active ${variables.policy_type} policy found for this client` 
+      }, { status: 404 });
     }
 
     // Process policy details
@@ -97,54 +109,46 @@ export async function POST(request: Request) {
 
     // Create complete document variables
     const documentVariables = {
-      // Client Information
-      full_name: client.fullName,
-      email_address: client.email,
-      phone_number: client.phoneNumber,
-      date_of_birth: formatDate(client.dateOfBirth),
-      
-      // Address Information
-      address: defaultAddress?.street || '',
-      city_state_zip: defaultAddress 
-        ? `${defaultAddress.city}, ${defaultAddress.state} ${defaultAddress.zipCode}`
-        : '',
-
-      // Policy Information
+      // Basic Policy Information
       policy_number: activePolicy.policyNumber,
-      policy_type: activePolicy.type,
       issue_date: formatDate(activePolicy.issueDate),
       effective_date: formatDate(activePolicy.effectiveDate),
       expiration_date: formatDate(activePolicy.expirationDate),
-      status: activePolicy.status,
+      policy_status: activePolicy.status.toUpperCase(),
 
-      // Coverage Details
-      coverage_limit: formatCurrency(coverageDetails.limit),
-      deductible: formatCurrency(coverageDetails.deductible),
+      // Policyholder Information
+      policyholder_name: client.fullName,
+      policyholder_address: defaultAddress?.street || '',
+      policyholder_city_state_zip: defaultAddress 
+        ? `${defaultAddress.city}, ${defaultAddress.state} ${defaultAddress.zipCode}`
+        : '',
+      policyholder_phone: client.phoneNumber,
+      policyholder_email: client.email,
+      policyholder_dob: formatDate(client.dateOfBirth),
+
+      // Coverage Information
+      liability_coverage: formatCurrency(coverageDetails.limit),
+      collision_deductible: formatCurrency(coverageDetails.deductible),
       coverage_description: coverageDetails.description,
 
-      // Premium Details
+      // Vehicle Information (for auto policies)
+      vehicle_make: coverageDetails.vehicleInfo?.make || '',
+      vehicle_model: coverageDetails.vehicleInfo?.model || '',
+      vehicle_year: coverageDetails.vehicleInfo?.year || '',
+      vehicle_vin: coverageDetails.vehicleInfo?.vin || '',
+
+      // Premium Information
       annual_premium: formatCurrency(premiumDetails.annualPremium),
+      monthly_premium: formatCurrency(premiumDetails.annualPremium / 12),
       payment_frequency: premiumDetails.paymentFrequency,
       next_payment_due: formatDate(premiumDetails.nextPaymentDue),
-      discount_amount: formatCurrency(premiumDetails.discount),
+      total_discount: formatCurrency(premiumDetails.discount),
+      net_premium: formatCurrency(premiumDetails.annualPremium - premiumDetails.discount),
 
-      // Type-specific details
-      ...(activePolicy.type === 'auto' && coverageDetails.vehicleInfo ? {
-        vehicle_make: coverageDetails.vehicleInfo.make,
-        vehicle_model: coverageDetails.vehicleInfo.model,
-        vehicle_year: coverageDetails.vehicleInfo.year,
-        vehicle_vin: coverageDetails.vehicleInfo.vin
-      } : {}),
-
-      ...(activePolicy.type === 'home' && coverageDetails.propertyInfo ? {
-        property_construction_year: coverageDetails.propertyInfo.constructionYear,
-        property_square_feet: coverageDetails.propertyInfo.squareFeet,
-        property_construction_type: coverageDetails.propertyInfo.constructionType
-      } : {}),
-
-      ...(activePolicy.type === 'life' ? {
-        term_length: coverageDetails.termLength
-      } : {}),
+      // Additional calculated fields
+      monthly_payment: formatCurrency(
+        (premiumDetails.annualPremium - premiumDetails.discount) / 12
+      ),
 
       // Document metadata
       generated_date: formatDate(new Date()),
@@ -209,7 +213,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const clientId = params.id
+    const clientId = params.id;
 
     const client = await prisma.client.findUnique({
       where: { id: clientId },
@@ -219,23 +223,25 @@ export async function GET(
           take: 1
         },
         policies: {
-          where: { status: 'active' },
+          where: { 
+            status: { in: ['active', 'ACTIVE'] }
+          },
           orderBy: { 
             effectiveDate: 'desc'
-          },
-          take: 1
+          }
         }
       }
-    })
+    });
 
     if (!client) {
       return NextResponse.json(
         { error: 'Client not found' },
         { status: 404 }
-      )
+      );
     }
 
-    const activePolicy = client.policies[0]
+    const policyTypes = [...new Set(client.policies.map(p => p.type))];
+    const hasPolicies = client.policies.length > 0;
 
     // Format response with all necessary data
     return NextResponse.json({
@@ -244,24 +250,24 @@ export async function GET(
         fullName: client.fullName,
         email: client.email,
         phoneNumber: client.phoneNumber,
-        dateOfBirth: client.dateOfBirth
+        dateOfBirth: client.dateOfBirth.toISOString()
       },
       defaultAddress: client.addresses[0] || null,
-      activePolicy: activePolicy ? {
-        ...activePolicy,
-        issueDate: activePolicy.issueDate.toISOString(),
-        effectiveDate: activePolicy.effectiveDate.toISOString(),
-        expirationDate: activePolicy.expirationDate.toISOString(),
-        coverageDetails: activePolicy.coverageDetails,
-        premiumDetails: activePolicy.premiumDetails
-      } : null
-    })
+      policies: client.policies.map(policy => ({
+        ...policy,
+        issueDate: policy.issueDate.toISOString(),
+        effectiveDate: policy.effectiveDate.toISOString(),
+        expirationDate: policy.expirationDate.toISOString()
+      })),
+      hasPolicies,
+      policyTypes
+    });
 
   } catch (error) {
-    console.error('Client details error:', error)
+    console.error('Client details error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch client details' },
       { status: 500 }
-    )
+    );
   }
 }

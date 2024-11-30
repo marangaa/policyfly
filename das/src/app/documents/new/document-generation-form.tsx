@@ -211,7 +211,7 @@ export function DocumentGenerationForm({
         const response = await fetch(`/api/clients/${selectedClient.id}/details`);
         const data = await response.json();
         
-        const matchingPolicy = data.policies?.find(p => p.type === type);
+        const matchingPolicy: Policy | undefined = data.policies?.find((p: Policy) => p.type === type);
         if (matchingPolicy) {
           autoFillForm(selectedClient); // This will now fill with the matching policy
         }
@@ -299,7 +299,7 @@ export function DocumentGenerationForm({
         full_name: data.client.fullName,
         email_address: data.client.email,
         phone_number: data.client.phoneNumber,
-        date_of_birth: data.client.dateOfBirth,
+        date_of_birth: new Date(data.client.dateOfBirth).toISOString().split('T')[0], // Fix date format
       };
 
       if (data.defaultAddress) {
@@ -309,43 +309,25 @@ export function DocumentGenerationForm({
       }
 
       if (defaultPolicy) {
-        // Auto-select the policy type
-        setSelectedPolicyType(defaultPolicy.type);
-        
-        // Map policy details
+        const coverageDetails = typeof defaultPolicy.coverageDetails === 'string'
+          ? JSON.parse(defaultPolicy.coverageDetails)
+          : defaultPolicy.coverageDetails;
+
+        const premiumDetails = typeof defaultPolicy.premiumDetails === 'string'
+          ? JSON.parse(defaultPolicy.premiumDetails)
+          : defaultPolicy.premiumDetails;
+
         Object.assign(mappedData, {
           policy_number: defaultPolicy.policyNumber,
-          issue_date: defaultPolicy.issueDate,
-          effective_date: defaultPolicy.effectiveDate,
-          expiration_date: defaultPolicy.expirationDate,
-          status: defaultPolicy.status,
-          'coverageDetails.limit': formatCurrency(defaultPolicy.coverageDetails.limit),
-          'coverageDetails.deductible': formatCurrency(defaultPolicy.coverageDetails.deductible),
-          'premiumDetails.annualPremium': formatCurrency(defaultPolicy.premiumDetails.annualPremium.toString()),
-          'premiumDetails.paymentFrequency': defaultPolicy.premiumDetails.paymentFrequency,
+          policy_status: defaultPolicy.status.toUpperCase(),
+          issue_date: new Date(defaultPolicy.issueDate).toISOString().split('T')[0], // Fix date format
+          effective_date: new Date(defaultPolicy.effectiveDate).toISOString().split('T')[0], // Fix date format
+          expiration_date: new Date(defaultPolicy.expirationDate).toISOString().split('T')[0], // Fix date format
+          annual_premium: premiumDetails.annualPremium?.toString() || '',
+          payment_frequency: premiumDetails.paymentFrequency || '',
+          liability_coverage: coverageDetails.limit?.toString() || '',
+          collision_deductible: coverageDetails.deductible?.toString() || '',
         });
-
-        // Handle type-specific details
-        if (defaultPolicy.type === 'auto' && defaultPolicy.coverageDetails.vehicleInfo) {
-          const { vehicleInfo } = defaultPolicy.coverageDetails;
-          Object.assign(mappedData, {
-            'coverageDetails.vehicleInfo.make': vehicleInfo.make,
-            'coverageDetails.vehicleInfo.model': vehicleInfo.model,
-            'coverageDetails.vehicleInfo.year': vehicleInfo.year.toString(),
-            'coverageDetails.vehicleInfo.vin': vehicleInfo.vin,
-          });
-        } else if (defaultPolicy.type === 'home' && defaultPolicy.coverageDetails.propertyInfo) {
-          const { propertyInfo } = defaultPolicy.coverageDetails;
-          Object.assign(mappedData, {
-            'coverageDetails.propertyInfo.constructionYear': propertyInfo.constructionYear.toString(),
-            'coverageDetails.propertyInfo.squareFeet': propertyInfo.squareFeet.toString(),
-            'coverageDetails.propertyInfo.constructionType': propertyInfo.constructionType,
-          });
-        } else if (defaultPolicy.type === 'life') {
-          Object.assign(mappedData, {
-            'coverageDetails.termLength': defaultPolicy.coverageDetails.termLength,
-          });
-        }
       }
 
       setAvailablePolicyTypes(data.policyTypes || []);
@@ -359,31 +341,15 @@ export function DocumentGenerationForm({
     }
   };
 
-
   // Form submission handler
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedTemplate) {
-      toast.error('Please select a template');
-      return;
-    }
-
-    // Validate required fields
-    const errors: Record<string, string> = {};
-    const requiredFields = getFieldsForPolicyType();
     
-    requiredFields.forEach((field) => {
-      if (!formData[field.key]?.trim()) {
-        errors[field.key] = 'This field is required';
-      }
-    });
-
-    if (Object.keys(errors).length > 0) {
-      setFormErrors(errors);
-      toast.error('Please fill in all required fields');
+    if (!selectedTemplate || !selectedClient || !selectedPolicyType) {
+      toast.error('Please select a template, client, and policy type');
       return;
     }
-
+  
     setIsGenerating(true);
     try {
       const response = await fetch('/api/documents/generate', {
@@ -391,31 +357,24 @@ export function DocumentGenerationForm({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           templateId: selectedTemplate.id,
-          clientId: selectedClient?.id,
-          variables: formData,
+          clientId: selectedClient.id,
+          variables: {
+            ...formData,
+            policy_type: selectedPolicyType
+          }
         }),
       });
-
-      const data = await response.json();
-
+  
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to generate document');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate document');
       }
-
-      // Handle document download
-      const downloadResponse = await fetch(data.downloadUrl);
-      const blob = await downloadResponse.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = data.filename || 'generated-document.docx';
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
+  
+      const data = await response.json();
+      
       toast.success('Document generated successfully!');
-      router.push('/documents');
+      router.push(`/documents/${data.documentId}`);
+      
     } catch (error) {
       console.error('Generation error:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to generate document');

@@ -10,12 +10,13 @@ function randomDate(start: Date, end: Date): Date {
   return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
 }
 
-// Helper function to generate a policy number
+// Helper function to generate a policy number with enhanced uniqueness
 function generatePolicyNumber(type: string): string {
   const prefix = type.substring(0, 2).toUpperCase()
   const year = new Date().getFullYear()
-  const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0')
-  return `${prefix}-${year}-${random}`
+  const timestamp = Date.now().toString().slice(-6)  // Use last 6 digits of timestamp
+  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
+  return `${prefix}-${year}-${timestamp}${random}`
 }
 
 // Helper function to generate VIN number
@@ -114,46 +115,102 @@ const POLICY_TYPES = {
   }
 }
 
-// Add more policy variations
+// Enhanced policy variations with detailed package configurations
 const POLICY_VARIATIONS = {
   auto: {
-    // ...existing auto config...
     packages: [
       {
         name: 'Basic',
         coverageLimit: '50000',
         deductible: '1000',
-        features: ['Liability', 'Collision']
+        features: ['Liability', 'Collision'],
+        monthlyPremiumRange: { min: 50, max: 150 },
+        requirements: ['Valid Driver\'s License', 'Vehicle Registration'],
+        restrictions: ['No DUI History', 'Licensed for at least 1 year']
       },
       {
         name: 'Premium',
         coverageLimit: '100000',
         deductible: '500',
-        features: ['Liability', 'Collision', 'Comprehensive', 'Roadside']
+        features: ['Liability', 'Collision', 'Comprehensive', 'Roadside'],
+        monthlyPremiumRange: { min: 100, max: 300 },
+        requirements: ['Valid Driver\'s License', 'Vehicle Registration', 'Clean Driving Record'],
+        restrictions: ['No Major Accidents in Past 3 Years']
       },
-      // Add more packages...
+      {
+        name: 'Elite',
+        coverageLimit: '250000',
+        deductible: '250',
+        features: ['Liability', 'Collision', 'Comprehensive', 'Roadside', 'Rental', 'Gap Coverage'],
+        monthlyPremiumRange: { min: 200, max: 500 },
+        requirements: ['Valid Driver\'s License', 'Vehicle Registration', 'Excellent Driving Record'],
+        restrictions: ['No Claims in Past 5 Years']
+      }
     ]
   },
   home: {
-    // ...existing home config...
     packages: [
       {
         name: 'Standard',
         coverageLimit: '250000',
         deductible: '2500',
-        features: ['Dwelling', 'Personal Property']
+        features: ['Dwelling', 'Personal Property', 'Liability'],
+        monthlyPremiumRange: { min: 75, max: 200 },
+        requirements: ['Home Inspection', 'Smoke Detectors'],
+        restrictions: ['No Previous Claims in Past 2 Years']
       },
       {
         name: 'Premium',
         coverageLimit: '500000',
         deductible: '1000',
-        features: ['Dwelling', 'Personal Property', 'Loss of Use', 'Extended Replacement']
+        features: ['Dwelling', 'Personal Property', 'Loss of Use', 'Extended Replacement', 'Personal Liability'],
+        monthlyPremiumRange: { min: 150, max: 400 },
+        requirements: ['Home Inspection', 'Security System', 'Fire Protection'],
+        restrictions: ['No Major Claims in Past 3 Years']
       },
-      // Add more packages...
+      {
+        name: 'Elite',
+        coverageLimit: '1000000',
+        deductible: '500',
+        features: ['Dwelling', 'Personal Property', 'Loss of Use', 'Extended Replacement', 'Personal Liability', 'Natural Disaster', 'High-Value Items'],
+        monthlyPremiumRange: { min: 300, max: 800 },
+        requirements: ['Professional Home Inspection', 'Advanced Security System', 'Fire Suppression System'],
+        restrictions: ['No Claims in Past 5 Years']
+      }
     ]
   },
-  // Add more policy types...
-};
+  life: {
+    packages: [
+      {
+        name: 'Term Basic',
+        coverageLimit: '100000',
+        deductible: '0',
+        features: ['Death Benefit', 'Terminal Illness Rider'],
+        monthlyPremiumRange: { min: 25, max: 100 },
+        requirements: ['Medical Exam', 'Health History'],
+        restrictions: ['Age 18-65', 'No Terminal Illnesses']
+      },
+      {
+        name: 'Term Plus',
+        coverageLimit: '500000',
+        deductible: '0',
+        features: ['Death Benefit', 'Terminal Illness Rider', 'Critical Illness Rider', 'Disability Waiver'],
+        monthlyPremiumRange: { min: 50, max: 200 },
+        requirements: ['Medical Exam', 'Health History', 'Financial Documentation'],
+        restrictions: ['Age 18-60', 'No Major Health Issues']
+      },
+      {
+        name: 'Whole Life',
+        coverageLimit: '1000000',
+        deductible: '0',
+        features: ['Death Benefit', 'Cash Value Accumulation', 'Dividend Eligibility', 'Loan Options'],
+        monthlyPremiumRange: { min: 200, max: 1000 },
+        requirements: ['Comprehensive Medical Exam', 'Health History', 'Financial Documentation', 'Income Verification'],
+        restrictions: ['Age 18-55', 'Excellent Health Status']
+      }
+    ]
+  }
+}
 
 // Helper function to generate random premium details
 function generatePremiumDetails(coverageLimit: string, policyType: keyof typeof POLICY_TYPES) {
@@ -161,20 +218,18 @@ function generatePremiumDetails(coverageLimit: string, policyType: keyof typeof 
     auto: 0.05,
     home: 0.003,
     life: 0.004
-  }[policyType]
+  }[policyType];
 
-  const annualPremium = Math.round(parseFloat(coverageLimit.replace(/[^0-9.]/g, '')) * baseRate)
-  const frequencies = ['monthly', 'quarterly', 'semi-annual', 'annual']
-  const frequency = faker.helpers.arrayElement(frequencies)
-  
-  const nextPaymentDate = faker.date.future()
+  const limitValue = parseInt(coverageLimit.replace(/[^0-9]/g, ''));
+  const annualPremium = Math.round(limitValue * baseRate);
+  const frequencies = ['Monthly', 'Quarterly', 'Semi-Annual', 'Annual'];
   
   return {
     annualPremium,
-    paymentFrequency: frequency,
-    nextPaymentDue: nextPaymentDate.toISOString(),
-    discount: Math.round(annualPremium * faker.number.float({ min: 0, max: 0.2 }))
-  }
+    paymentFrequency: faker.helpers.arrayElement(frequencies),
+    nextPaymentDue: faker.date.future().toISOString(),
+    discount: Math.round(annualPremium * faker.number.float({ min: 0.05, max: 0.2 }))
+  };
 }
 
 // Helper function to generate coverage details based on policy type
@@ -211,36 +266,33 @@ interface LifeCoverageDetails extends CoverageDetailsBase {
 
 type CoverageDetails = AutoCoverageDetails | HomeCoverageDetails | LifeCoverageDetails;
 
-function generateCoverageDetails(type: keyof typeof POLICY_TYPES, policyTypeData: typeof POLICY_TYPES[keyof typeof POLICY_TYPES]): CoverageDetails | undefined {
+function generateCoverageDetails(type: keyof typeof POLICY_TYPES, policyTypeData: typeof POLICY_TYPES[keyof typeof POLICY_TYPES]): CoverageDetails {
   const limit = faker.helpers.arrayElement(policyTypeData.limits);
   const deductible = faker.helpers.arrayElement(policyTypeData.deductibles);
+  const description = faker.helpers.arrayElement(policyTypeData.descriptions);
 
-  const baseDetails: CoverageDetailsBase = {
-    limit,
-    deductible,
-    description: faker.helpers.arrayElement(policyTypeData.descriptions)
+  const baseDetails = {
+    limit: limit,
+    deductible: deductible,
+    description: description,
   };
 
-  switch (type) {
-    case 'auto': {
-      if ('vehicles' in policyTypeData) {
-        const vehicle = faker.helpers.arrayElement(policyTypeData.vehicles);
-        return {
-          ...baseDetails,
-          vehicleInfo: {
-            make: vehicle.make,
-            model: vehicle.model,
-            year: faker.number.int({ 
-              min: vehicle.yearRange[0], 
-              max: vehicle.yearRange[1] 
-            }),
-            vin: generateVIN()
-          }
-        } as AutoCoverageDetails;
-      }
-      break;
+  if (type === 'auto') {
+    if ('vehicles' in policyTypeData) {
+      const vehicle = faker.helpers.arrayElement(policyTypeData.vehicles);
+      return {
+        ...baseDetails,
+        vehicleInfo: {
+          make: vehicle.make,
+          model: vehicle.model,
+          year: faker.number.int({ min: vehicle.yearRange[0], max: vehicle.yearRange[1] }),
+          vin: generateVIN()
+        }
+      };
     }
-    
+  }
+
+  switch (type) {
     case 'home': {
       return {
         ...baseDetails,
@@ -258,6 +310,9 @@ function generateCoverageDetails(type: keyof typeof POLICY_TYPES, policyTypeData
         termLength: faker.helpers.arrayElement(['10 Years', '20 Years', '30 Years'])
       } as LifeCoverageDetails;
     }
+    
+    default:
+      throw new Error(`Unsupported policy type: ${type}`);
   }
 }
 
@@ -271,7 +326,6 @@ async function main() {
 
   console.log('Starting to seed the database...')
 
-  // Create 50 clients with varying numbers of policies and addresses
   for (let i = 0; i < 500; i++) {
     const firstName = faker.person.firstName()
     const lastName = faker.person.lastName()
@@ -309,11 +363,10 @@ async function main() {
     }
 
     // Assign 1-3 policies with different types
-    const policyCount = Math.floor(Math.random() * 3) + 1;
-    const availableTypes = Object.keys(POLICY_VARIATIONS);
-    const selectedTypes = faker.helpers.arrayElements(availableTypes, policyCount);
+    const policyCount = Math.floor(Math.random() * 3) + 1
+    const availableTypes = Object.keys(POLICY_VARIATIONS)
+    const selectedTypes = faker.helpers.arrayElements(availableTypes, policyCount)
 
-    // Update policy creation
     for (const type of selectedTypes as (keyof typeof POLICY_TYPES)[]) {
       const policyTypeData = POLICY_TYPES[type];
       const coverageDetails = generateCoverageDetails(type, policyTypeData);
