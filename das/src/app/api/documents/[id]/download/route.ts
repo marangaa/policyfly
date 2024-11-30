@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { promises as fs } from "fs";
 import path from "path";
@@ -27,11 +27,11 @@ async function getDocumentBuffer(filePath: string) {
 }
 
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  context: { params: { id: string } }
 ) {
   try {
-    const document = await getDocument(params.id);
+    const document = await getDocument(context.params.id);
     const buffer = await getDocumentBuffer(document.filePath);
 
     return new NextResponse(buffer, {
