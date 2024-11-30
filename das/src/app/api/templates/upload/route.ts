@@ -44,7 +44,7 @@ export async function POST(request: Request) {
         paragraphLoop: true,
         linebreaks: true,
         // Add error handling for undefined variables
-        nullGetter: (part: any) => {
+        nullGetter: (part: { module: unknown; value: string }) => {
           if (!part.module) {
             return "{" + part.value + "}";
           }

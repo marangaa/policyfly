@@ -91,7 +91,7 @@ export default async function DocumentsPage({
               <DocumentsTable
                 documents={documents.map((doc) => ({
                   ...doc,
-                  data: doc.data as Record<string, any>,
+                  data: doc.data as Record<string, string | number | boolean>,
                 }))}
                 totalPages={Math.ceil(totalCount / pageSize)}
                 currentPage={page}

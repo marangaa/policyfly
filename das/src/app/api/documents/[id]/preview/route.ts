@@ -32,7 +32,7 @@ export async function GET(
     const stream = createReadStream(filePath);
 
     // Return the file for preview (inline display)
-    return new NextResponse(stream as any, {
+    return new NextResponse(stream as unknown as ReadableStream, {
       headers: {
         "Content-Type":
           "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
