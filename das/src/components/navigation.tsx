@@ -13,7 +13,6 @@ export function Navigation() {
     { name: "Dashboard", href: "/" },
     { name: "Templates", href: "/templates" },
     { name: "Documents", href: "/documents" },
-    { name: "Create Template", href: "/templates/create" },
   ];
 
   const isActivePath = (path: string) =>
