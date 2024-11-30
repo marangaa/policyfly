@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+type Params = { params: { id: string } }
+
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: Params
 ) {
   try {
-    const { id } = context.params;
+    const { id } = params;
     
     if (!id) {
       return NextResponse.json({ error: "Invalid client ID" }, { status: 400 });
