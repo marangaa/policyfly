@@ -1,4 +1,3 @@
-// app/api/documents/generate/route.ts
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import PizZip from 'pizzip'
@@ -44,20 +43,28 @@ function formatDate(date: Date | string | null): string {
   })
 }
 
+function validateVariables(variables: any, template: any): boolean {
+  const requiredFields = template.variables as string[];
+  return requiredFields.every(field => {
+    const value = variables[field];
+    return value !== undefined && value !== null && value !== '';
+  });
+}
+
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
-    const { templateId, clientId, variables } = body
+    const body = await request.json();
+    const { templateId, clientId, variables } = body;
 
     // Validate the request
     if (!templateId || !variables) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
-      )
+      );
     }
 
-    // Fetch complete data from database
+    // Fetch complete data from database with enhanced policy information
     const [template, client] = await Promise.all([
       prisma.template.findUnique({
         where: { id: templateId }
@@ -71,97 +78,95 @@ export async function POST(request: Request) {
           },
           policies: {
             where: { status: 'active' },
-            orderBy: { effectiveDate: 'desc' },
-            take: 1
+            orderBy: [
+              { type: 'asc' },
+              { effectiveDate: 'desc' }
+            ]
           }
         }
       }) : null
-    ])
+    ]);
 
     if (!template) {
       return NextResponse.json(
         { error: 'Template not found' },
         { status: 404 }
-      )
+      );
     }
 
-    // Read template file
-    const templatePath = path.join(process.cwd(), 'uploads', 'templates', template.filePath)
-    const templateContent = await fs.readFile(templatePath)
+    // Validate variables against template requirements
+    if (!validateVariables(variables, template)) {
+      return NextResponse.json(
+        { error: 'Missing required template variables' },
+        { status: 400 }
+      );
+    }
 
-    // Create ZIP instance
-    const zip = new PizZip(templateContent)
+    // Process variables for document generation
+    const processedVariables = {
+      ...variables,
+      
+      // Client information
+      client_name: variables.full_name || client?.fullName || '',
+      client_email: variables.email_address || client?.email || '',
+      client_phone: variables.phone_number || client?.phoneNumber || '',
+      
+      // Format dates consistently
+      issue_date: formatDate(variables.issue_date),
+      effective_date: formatDate(variables.effective_date),
+      expiration_date: formatDate(variables.expiration_date),
+      
+      // Convert currency strings to numbers for comparisons
+      coverage_limit_number: parseCurrencyToNumber(variables.coverage_limit),
+      
+      // Policy information
+      policy_number: variables.policy_number || '',
+      policy_type: variables.policy_type || '',
+      status: variables.status || 'pending',
+
+      // Address formatting
+      formatted_address: client?.addresses[0] ? 
+        `${client.addresses[0].street}, ${client.addresses[0].city}, ${client.addresses[0].state} ${client.addresses[0].zipCode}` : 
+        variables.address || '',
+
+      // Helper functions
+      includes: (str: string, search: string) => str?.includes?.(search) || false,
+      startsWith: (str: string, search: string) => str?.startsWith?.(search) || false,
+      endsWith: (str: string, search: string) => str?.endsWith?.(search) || false,
+
+      // Dates for signatures
+      representative_signature_date: formatDate(new Date()),
+      policyholder_signature_date: formatDate(new Date())
+    };
+
+    // Read and process template
+    const templatePath = path.join(process.cwd(), 'uploads', 'templates', template.filePath);
+    const templateContent = await fs.readFile(templatePath);
+    const zip = new PizZip(templateContent);
 
     // Configure document generator
     const doc = new Docxtemplater(zip, {
       paragraphLoop: true,
       linebreaks: true,
       parser: angularParser
-    })
+    });
 
-    // Process variables for conditions
-    const activePolicy = client?.policies[0]
-
-    // Prepare comprehensive data object
-    const processedVariables = {
-      ...variables,
-      
-      // Format dates
-      issue_date: formatDate(variables.issue_date || activePolicy?.issueDate),
-      effective_date: formatDate(variables.effective_date || activePolicy?.effectiveDate),
-      expiration_date: formatDate(variables.expiration_date || activePolicy?.expirationDate),
-      
-      // Convert currency strings to numbers for comparisons
-      coverage_limit_number: parseCurrencyToNumber(variables.coverage_limit),
-      
-      // Policy details
-      policy_type: variables.policy_type || activePolicy?.type || '',
-      policy_number: variables.policy_number || activePolicy?.policyNumber || '',
-      status: variables.status || activePolicy?.status || 'pending',
-      
-      // Premium information
-      premiumDetails: activePolicy?.premiumDetails || {
-        annualPremium: '0',
-        paymentFrequency: 'monthly',
-        nextPaymentDue: new Date().toISOString(),
-        discount: 0
-      },
-      
-      // Coverage details based on policy type
-      coverageDetails: {
-        ...activePolicy?.coverageDetails,
-        ...variables.coverageDetails
-      },
-
-      // Helper functions for string operations
-      includes: (str: string, search: string) => str?.includes?.(search) || false,
-      startsWith: (str: string, search: string) => str?.startsWith?.(search) || false,
-      endsWith: (str: string, search: string) => str?.endsWith?.(search) || false,
-
-      // Signature dates default to today
-      representative_signature_date: formatDate(new Date()),
-      policyholder_signature_date: formatDate(new Date())
-    }
-
-    // Render document with processed variables
-    doc.render(processedVariables)
+    // Render document
+    doc.render(processedVariables);
 
     // Generate buffer
     const buffer = doc.getZip().generate({
       type: 'nodebuffer',
       compression: 'DEFLATE'
-    })
+    });
 
-    // Create filename
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-    const fileName = `${template.name}-${timestamp}.docx`
-    const filePath = path.join(process.cwd(), 'uploads', 'documents', fileName)
+    // Create filename and save
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fileName = `${template.name}-${timestamp}.docx`;
+    const filePath = path.join(process.cwd(), 'uploads', 'documents', fileName);
 
-    // Ensure documents directory exists
-    await fs.mkdir(path.join(process.cwd(), 'uploads', 'documents'), { recursive: true })
-
-    // Save document
-    await fs.writeFile(filePath, buffer)
+    await fs.mkdir(path.join(process.cwd(), 'uploads', 'documents'), { recursive: true });
+    await fs.writeFile(filePath, buffer);
 
     // Create database record
     const document = await prisma.document.create({
@@ -172,27 +177,24 @@ export async function POST(request: Request) {
         clientId,
         data: processedVariables
       }
-    })
-
-    // Generate download URL
-    const downloadUrl = `/api/documents/${document.id}/download`
+    });
 
     return NextResponse.json({
       message: 'Document generated successfully',
       documentId: document.id,
-      downloadUrl,
+      downloadUrl: `/api/documents/${document.id}/download`,
       filename: fileName
-    })
+    });
 
   } catch (error) {
-    console.error('Document generation error:', error)
+    console.error('Document generation error:', error);
     return NextResponse.json(
       { 
         error: 'Failed to generate document',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
-    )
+    );
   }
 }
 

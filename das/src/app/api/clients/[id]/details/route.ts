@@ -1,9 +1,13 @@
-import { NextResponse, NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export async function GET(request: NextRequest) {
+export async function GET(
+  request: NextRequest,
+  context: { params: { id: string } }
+) {
   try {
-    const id = request.url.split('/').pop();
+    const { id } = context.params;
+    
     if (!id) {
       return NextResponse.json({ error: "Invalid client ID" }, { status: 400 });
     }
@@ -16,14 +20,14 @@ export async function GET(request: NextRequest) {
           take: 1,
         },
         policies: {
-          where: { status: "active" },
+          where: { 
+            // Convert to uppercase to match schema
+            status: { in: ['ACTIVE', 'active'] }
+          },
           orderBy: {
             effectiveDate: "desc",
           },
           take: 1,
-          include: {
-            // Include any other related policy data if needed
-          },
         },
         documents: {
           orderBy: { createdAt: "desc" },
@@ -39,7 +43,10 @@ export async function GET(request: NextRequest) {
     });
 
     if (!client) {
-      return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Client not found" }, 
+        { status: 404 }
+      );
     }
 
     // Get active policy with properly formatted dates
@@ -53,26 +60,24 @@ export async function GET(request: NextRequest) {
         fullName: client.fullName,
         email: client.email,
         phoneNumber: client.phoneNumber,
-        dateOfBirth: client.dateOfBirth.toISOString().split("T")[0], // Format as YYYY-MM-DD
+        dateOfBirth: client.dateOfBirth?.toISOString().split('T')[0] || '',
       },
       defaultAddress: client.addresses[0] || null,
-      activePolicy: activePolicy
-        ? {
-            ...activePolicy,
-            effectiveDate: activePolicy.effectiveDate
-              .toISOString()
-              .split("T")[0],
-            expirationDate: activePolicy.expirationDate
-              .toISOString()
-              .split("T")[0],
-            coverageDetails: activePolicy.coverageDetails || {
-              description: "",
-              limit: "",
-              deductible: "",
-            },
-            issueDate: activePolicy.effectiveDate.toISOString().split("T")[0],
-          }
-        : null,
+      activePolicy: activePolicy ? {
+        id: activePolicy.id,
+        policyNumber: activePolicy.policyNumber,
+        type: activePolicy.type.toLowerCase(), // Normalize type for form
+        status: activePolicy.status.toLowerCase(), // Normalize status for form
+        issueDate: activePolicy.issueDate?.toISOString().split('T')[0] || '',
+        effectiveDate: activePolicy.effectiveDate?.toISOString().split('T')[0] || '',
+        expirationDate: activePolicy.expirationDate?.toISOString().split('T')[0] || '',
+        coverageDetails: typeof activePolicy.coverageDetails === 'string' 
+          ? JSON.parse(activePolicy.coverageDetails)
+          : activePolicy.coverageDetails,
+        premiumDetails: typeof activePolicy.premiumDetails === 'string'
+          ? JSON.parse(activePolicy.premiumDetails)
+          : activePolicy.premiumDetails
+      } : null,
       recentDocuments: client.documents,
       signatureDates: {
         representative: today.toISOString().split("T")[0],
@@ -82,9 +87,18 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Client details error:", error);
+    
+    // More specific error handling
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 500 }
+      );
+    }
+    
     return NextResponse.json(
       { error: "Failed to fetch client details" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

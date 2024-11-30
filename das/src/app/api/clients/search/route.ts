@@ -1,10 +1,10 @@
 // app/api/clients/search/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
+    const { searchParams } = request.nextUrl;
     const query = searchParams.get("q");
 
     if (!query || query.length < 2) {
@@ -33,9 +33,17 @@ export async function GET(request: Request) {
     return NextResponse.json({ clients });
   } catch (error) {
     console.error("Client search error:", error);
+    
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 500 }
+      );
+    }
+    
     return NextResponse.json(
       { error: "Failed to search clients" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

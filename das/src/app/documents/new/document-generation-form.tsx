@@ -170,6 +170,7 @@ export function DocumentGenerationForm({
   const [searching, setSearching] = useState(false);
   const [searchDebounceTimeout, setSearchDebounceTimeout] = useState<NodeJS.Timeout>();
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [availablePolicyTypes, setAvailablePolicyTypes] = useState<string[]>([]);
 
   // Get fields based on policy type
   const getFieldsForPolicyType = () => {
@@ -279,42 +280,64 @@ export function DocumentGenerationForm({
       if (!response.ok) throw new Error('Failed to fetch client details');
 
       const data: ClientDetails = await response.json();
+      
+      // Ensure all date fields are properly formatted
+      const formatDateStr = (dateStr: string | null | undefined) => 
+        dateStr ? new Date(dateStr).toISOString().split('T')[0] : '';
 
-      // Create a complete mapped data object
+      // Extract coverage details based on policy type
+      const coverageDetails = data.activePolicy?.coverageDetails || {};
+      const policyType = data.activePolicy?.type?.toLowerCase() || '';
+
+      // Create mapped data with proper type checking
       const mappedData: Record<string, string> = {
-        full_name: data.client.fullName,
-        email_address: data.client.email,
-        phone_number: data.client.phoneNumber,
-        date_of_birth: data.client.dateOfBirth,
+        full_name: data.client.fullName || '',
+        email_address: data.client.email || '',
+        phone_number: data.client.phoneNumber || '',
+        date_of_birth: formatDateStr(data.client.dateOfBirth),
         address: data.defaultAddress?.street || '',
         city_state_zip: data.defaultAddress
           ? `${data.defaultAddress.city}, ${data.defaultAddress.state} ${data.defaultAddress.zipCode}`
           : '',
         policy_number: data.activePolicy?.policyNumber || '',
-        policy_type: data.activePolicy?.type || '',
-        issue_date: data.activePolicy?.issueDate || '',
-        effective_date: data.activePolicy?.effectiveDate || '',
-        expiration_date: data.activePolicy?.expirationDate || '',
-        coverage_description: data.activePolicy?.coverageDetails?.description || '',
-        coverage_limit: data.activePolicy?.coverageDetails?.limit || '',
-        deductible_amount: data.activePolicy?.coverageDetails?.deductible || '',
-        representative_signature_date: data.signatureDates.representative,
-        policyholder_signature_date: data.signatureDates.policyholder,
-        terms_and_conditions: data.defaultTerms,
+        policy_type: policyType,
+        issue_date: formatDateStr(data.activePolicy?.issueDate),
+        effective_date: formatDateStr(data.activePolicy?.effectiveDate),
+        expiration_date: formatDateStr(data.activePolicy?.expirationDate),
+        
+        // Handle specific policy type fields
+        ...(policyType === 'auto' && {
+          'coverageDetails.vehicleInfo.make': coverageDetails.vehicleInfo?.make || '',
+          'coverageDetails.vehicleInfo.model': coverageDetails.vehicleInfo?.model || '',
+          'coverageDetails.vehicleInfo.year': coverageDetails.vehicleInfo?.year?.toString() || '',
+          'coverageDetails.vehicleInfo.vin': coverageDetails.vehicleInfo?.vin || '',
+        }),
+        
+        ...(policyType === 'home' && {
+          'coverageDetails.propertyInfo.constructionYear': coverageDetails.propertyInfo?.constructionYear?.toString() || '',
+          'coverageDetails.propertyInfo.squareFeet': coverageDetails.propertyInfo?.squareFeet?.toString() || '',
+          'coverageDetails.propertyInfo.constructionType': coverageDetails.propertyInfo?.constructionType || '',
+        }),
+
+        coverage_limit: coverageDetails.limit || '',
+        deductible_amount: coverageDetails.deductible || '',
       };
 
       setFormData(mappedData);
-      
-      // Set policy type if available
-      if (data.activePolicy?.type) {
-        setSelectedPolicyType(data.activePolicy.type.toLowerCase());
-      }
-      
+      setSelectedPolicyType(policyType);
       toast.success('Form auto-filled with client data');
+      const policyTypes = [...new Set(data.activePolicy ? [data.activePolicy.type.toLowerCase()] : [])];
+      setAvailablePolicyTypes(policyTypes);
+
+      // If there's only one policy type, auto-select it
+      if (policyTypes.length === 1) {
+        setSelectedPolicyType(policyTypes[0]);
+      }
     } catch (error) {
       console.error('Auto-fill error:', error);
       toast.error('Failed to auto-fill form');
       setFormData({});
+      setAvailablePolicyTypes([]);
     }
   };
 
@@ -384,6 +407,39 @@ export function DocumentGenerationForm({
       }
     };
   }, [searchDebounceTimeout]);
+
+  const renderPolicyTypeSelection = () => {
+    // If no client is selected, show all policy types
+    const policyTypes = selectedClient 
+      ? availablePolicyTypes
+      : ['auto', 'home', 'life'];
+
+    if (policyTypes.length === 0) {
+      return (
+        <div className="p-4 bg-yellow-50 rounded-lg">
+          <p className="text-sm text-yellow-700">
+            No active policies found for this client. Please select a different client or create a new policy.
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <select
+        className="appearance-none w-full rounded-lg border-gray-200 bg-gray-50 focus:bg-white
+          py-3 px-4 pr-10 text-base focus:border-blue-500 focus:ring-blue-500 transition-colors"
+        value={selectedPolicyType}
+        onChange={(e) => handlePolicyTypeChange(e.target.value)}
+      >
+        <option value="">Select policy type...</option>
+        {policyTypes.map((type) => (
+          <option key={type} value={type}>
+            {type.charAt(0).toUpperCase() + type.slice(1)} Insurance
+          </option>
+        ))}
+      </select>
+    );
+  };
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -502,17 +558,7 @@ export function DocumentGenerationForm({
               </div>
 
               <div className="mt-4 relative">
-                <select
-                  className="appearance-none w-full rounded-lg border-gray-200 bg-gray-50 focus:bg-white
-                    py-3 px-4 pr-10 text-base focus:border-blue-500 focus:ring-blue-500 transition-colors"
-                  value={selectedPolicyType}
-                  onChange={(e) => handlePolicyTypeChange(e.target.value)}
-                >
-                  <option value="">Select policy type...</option>
-                  <option value="auto">Auto Insurance</option>
-                  <option value="home">Home Insurance</option>
-                  <option value="life">Life Insurance</option>
-                </select>
+                {renderPolicyTypeSelection()}
                 <ChevronDown className="absolute right-3 top-3.5 h-5 w-5 text-gray-400 pointer-events-none" />
               </div>
             </div>
