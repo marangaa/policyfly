@@ -72,7 +72,6 @@ export async function GET(
         : policy.premiumDetails,
     }));
 
-    const today = new Date();
 
     // Format the response with complete data mapping
     return NextResponse.json({

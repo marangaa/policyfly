@@ -26,11 +26,30 @@ export async function GET(request: NextRequest) {
           },
         ],
       },
+      include: {
+        policies: {
+          where: { status: { in: ['ACTIVE', 'active'] } },
+          select: {
+            id: true,
+            policyNumber: true,
+            type: true,
+          }
+        }
+      },
       take: 5, // Limit results to prevent overwhelming the UI
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json({ clients });
+    return NextResponse.json({ 
+      clients: clients.map(client => ({
+        id: client.id,
+        fullName: client.fullName,
+        email: client.email,
+        phoneNumber: client.phoneNumber,
+        dateOfBirth: client.dateOfBirth.toISOString(),
+        activePolicies: client.policies
+      }))
+    });
   } catch (error) {
     console.error("Client search error:", error);
     

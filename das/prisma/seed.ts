@@ -272,7 +272,7 @@ async function main() {
   console.log('Starting to seed the database...')
 
   // Create 50 clients with varying numbers of policies and addresses
-  for (let i = 0; i < 50; i++) {
+  for (let i = 0; i < 500; i++) {
     const firstName = faker.person.firstName()
     const lastName = faker.person.lastName()
     const email = faker.internet.email({ firstName, lastName }).toLowerCase()
@@ -285,7 +285,7 @@ async function main() {
         phoneNumber: faker.phone.number(),
         dateOfBirth: faker.date.between({ 
           from: '1960-01-01', 
-          to: '2000-12-31' 
+          to: '2016-12-31' 
         }),
       }
     })

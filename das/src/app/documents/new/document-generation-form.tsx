@@ -203,18 +203,22 @@ export function DocumentGenerationForm({
   };
 
   // Handle policy type selection
-  const handlePolicyTypeChange = (type: string) => {
+  const handlePolicyTypeChange = async (type: string) => {
     setSelectedPolicyType(type);
-    setFormData(prev => {
-      const newData = { ...prev };
-      // Clear previous policy-specific fields
-      Object.keys(newData).forEach(key => {
-        if (!COMMON_FIELDS.find(field => field.key === key)) {
-          delete newData[key];
+    
+    if (selectedClient) {
+      try {
+        const response = await fetch(`/api/clients/${selectedClient.id}/details`);
+        const data = await response.json();
+        
+        const matchingPolicy = data.policies?.find(p => p.type === type);
+        if (matchingPolicy) {
+          autoFillForm(selectedClient); // This will now fill with the matching policy
         }
-      });
-      return newData;
-    });
+      } catch (error) {
+        console.error('Error fetching policy details:', error);
+      }
+    }
   };
 
   // Handle form field changes
@@ -290,6 +294,7 @@ export function DocumentGenerationForm({
         return;
       }
 
+      const defaultPolicy = data.policies?.[0];
       const mappedData: Record<string, string> = {
         full_name: data.client.fullName,
         email_address: data.client.email,
@@ -303,24 +308,47 @@ export function DocumentGenerationForm({
           `${data.defaultAddress.city}, ${data.defaultAddress.state} ${data.defaultAddress.zipCode}`;
       }
 
-      if (data.policyTypes?.length) {
-        setAvailablePolicyTypes(data.policyTypes);
+      if (defaultPolicy) {
+        // Auto-select the policy type
+        setSelectedPolicyType(defaultPolicy.type);
         
-        if (data.policyTypes.length === 1 && data.policies?.[0]) {
-          const policy = data.policies[0];
-          setSelectedPolicyType(policy.type);
-          
+        // Map policy details
+        Object.assign(mappedData, {
+          policy_number: defaultPolicy.policyNumber,
+          issue_date: defaultPolicy.issueDate,
+          effective_date: defaultPolicy.effectiveDate,
+          expiration_date: defaultPolicy.expirationDate,
+          status: defaultPolicy.status,
+          'coverageDetails.limit': formatCurrency(defaultPolicy.coverageDetails.limit),
+          'coverageDetails.deductible': formatCurrency(defaultPolicy.coverageDetails.deductible),
+          'premiumDetails.annualPremium': formatCurrency(defaultPolicy.premiumDetails.annualPremium.toString()),
+          'premiumDetails.paymentFrequency': defaultPolicy.premiumDetails.paymentFrequency,
+        });
+
+        // Handle type-specific details
+        if (defaultPolicy.type === 'auto' && defaultPolicy.coverageDetails.vehicleInfo) {
+          const { vehicleInfo } = defaultPolicy.coverageDetails;
           Object.assign(mappedData, {
-            policy_number: policy.policyNumber,
-            issue_date: policy.issueDate,
-            effective_date: policy.effectiveDate,
-            expiration_date: policy.expirationDate,
-            status: policy.status,
-            ...generatePolicySpecificFields(policy)
+            'coverageDetails.vehicleInfo.make': vehicleInfo.make,
+            'coverageDetails.vehicleInfo.model': vehicleInfo.model,
+            'coverageDetails.vehicleInfo.year': vehicleInfo.year.toString(),
+            'coverageDetails.vehicleInfo.vin': vehicleInfo.vin,
+          });
+        } else if (defaultPolicy.type === 'home' && defaultPolicy.coverageDetails.propertyInfo) {
+          const { propertyInfo } = defaultPolicy.coverageDetails;
+          Object.assign(mappedData, {
+            'coverageDetails.propertyInfo.constructionYear': propertyInfo.constructionYear.toString(),
+            'coverageDetails.propertyInfo.squareFeet': propertyInfo.squareFeet.toString(),
+            'coverageDetails.propertyInfo.constructionType': propertyInfo.constructionType,
+          });
+        } else if (defaultPolicy.type === 'life') {
+          Object.assign(mappedData, {
+            'coverageDetails.termLength': defaultPolicy.coverageDetails.termLength,
           });
         }
       }
 
+      setAvailablePolicyTypes(data.policyTypes || []);
       setFormData(mappedData);
       toast.success('Form auto-filled with client data');
     } catch (error) {
@@ -331,41 +359,6 @@ export function DocumentGenerationForm({
     }
   };
 
-  // Helper function to generate policy-specific fields
-  const generatePolicySpecificFields = (policy: Policy): Record<string, string> => {
-    const fields: Record<string, string> = {};
-    
-    if (policy.premiumDetails) {
-      fields['premiumDetails.annualPremium'] = policy.premiumDetails.annualPremium.toString();
-      fields['premiumDetails.paymentFrequency'] = policy.premiumDetails.paymentFrequency;
-    }
-
-    if (policy.coverageDetails) {
-      const { coverageDetails } = policy;
-      
-      // Add coverage limit and deductible
-      fields['coverage_limit'] = coverageDetails.limit || '';
-      fields['deductible_amount'] = coverageDetails.deductible || '';
-      
-      if (policy.type === 'auto' && coverageDetails.vehicleInfo) {
-        Object.entries(coverageDetails.vehicleInfo).forEach(([key, value]) => {
-          fields[`coverageDetails.vehicleInfo.${key}`] = value.toString();
-        });
-      }
-      
-      if (policy.type === 'home' && coverageDetails.propertyInfo) {
-        Object.entries(coverageDetails.propertyInfo).forEach(([key, value]) => {
-          fields[`coverageDetails.propertyInfo.${key}`] = value.toString();
-        });
-      }
-      
-      if (policy.type === 'life' && 'termLength' in coverageDetails) {
-        fields['coverageDetails.termLength'] = coverageDetails.termLength;
-      }
-    }
-
-    return fields;
-  };
 
   // Form submission handler
   const handleSubmit = async (e: React.FormEvent) => {

@@ -27,27 +27,25 @@ function angularParser(tag: string) {
   }
 }
 
-// Helper to parse currency string to number
-function parseCurrencyToNumber(value: string): number {
-  if (!value) return 0
-  return Number(value.replace(/[^0-9.-]+/g, ''))
-}
 
 // Helper to format dates consistently
-function formatDate(date: Date | string | null): string {
-  if (!date) return ''
-  return new Date(date).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  })
+
+function formatCurrency(value: string | number): string {
+  const num = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]+/g, '')) : value;
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2
+  }).format(num);
 }
 
-function validateVariables(variables: Record<string, string | number | boolean>, template: { variables: string[] }): boolean {
-  const requiredFields = template.variables as string[];
-  return requiredFields.every(field => {
-    const value = variables[field];
-    return value !== undefined && value !== null && value !== '';
+function formatDate(date: string | Date): string {
+  if (!date) return '';
+  const d = new Date(date);
+  return d.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
   });
 }
 
@@ -56,135 +54,133 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { templateId, clientId, variables } = body;
 
-    // Enhanced validation
-    if (!templateId) {
-      return NextResponse.json(
-        { error: 'Template ID is required' },
-        { status: 400 }
-      );
+    // Validate required data
+    if (!templateId || !clientId) {
+      return NextResponse.json({ error: 'Template ID and Client ID are required' }, { status: 400 });
     }
 
-    if (!variables || Object.keys(variables).length === 0) {
-      return NextResponse.json(
-        { error: 'Document variables are required' },
-        { status: 400 }
-      );
-    }
-
-    // Fetch template first to validate
-    const template = await prisma.template.findUnique({
-      where: { id: templateId }
-    });
-
-    if (!template) {
-      return NextResponse.json(
-        { error: 'Template not found' },
-        { status: 404 }
-      );
-    }
-
-    // Fetch client if provided
-    let client = null;
-    if (clientId) {
-      client = await prisma.client.findUnique({
+    // Fetch all required data
+    const [template, client] = await Promise.all([
+      prisma.template.findUnique({ where: { id: templateId } }),
+      prisma.client.findUnique({
         where: { id: clientId },
         include: {
-          addresses: {
-            where: { isDefault: true },
-            take: 1
-          },
+          addresses: { where: { isDefault: true } },
           policies: {
-            where: { status: 'active' },
-            orderBy: [
-              { type: 'asc' },
-              { effectiveDate: 'desc' }
-            ]
+            where: { type: variables.policy_type, status: 'active' },
+            orderBy: { effectiveDate: 'desc' },
+            take: 1
           }
         }
-      });
+      })
+    ]);
 
-      if (!client) {
-        return NextResponse.json(
-          { error: 'Client not found' },
-          { status: 404 }
-        );
-      }
+    if (!template || !client) {
+      return NextResponse.json({ error: 'Template or client not found' }, { status: 404 });
     }
 
-    // Process variables for document generation
-    const processedVariables = {
-      ...variables,
-      
-      // Client information
-      client_name: variables.full_name || client?.fullName || '',
-      client_email: variables.email_address || client?.email || '',
-      client_phone: variables.phone_number || client?.phoneNumber || '',
-      
-      // Format dates consistently
-      issue_date: formatDate(variables.issue_date),
-      effective_date: formatDate(variables.effective_date),
-      expiration_date: formatDate(variables.expiration_date),
-      
-      // Convert currency strings to numbers for comparisons
-      coverage_limit_number: parseCurrencyToNumber(variables.coverage_limit),
-      
-      // Policy information
-      policy_number: variables.policy_number || '',
-      policy_type: variables.policy_type || '',
-      status: variables.status || 'pending',
+    const defaultAddress = client.addresses[0];
+    const activePolicy = client.policies[0];
 
-      // Address formatting
-      formatted_address: client?.addresses[0] ? 
-        `${client.addresses[0].street}, ${client.addresses[0].city}, ${client.addresses[0].state} ${client.addresses[0].zipCode}` : 
-        variables.address || '',
+    if (!activePolicy) {
+      return NextResponse.json({ error: 'No active policy found' }, { status: 404 });
+    }
 
-      // Helper functions
-      includes: (str: string, search: string) => str?.includes?.(search) || false,
-      startsWith: (str: string, search: string) => str?.startsWith?.(search) || false,
-      endsWith: (str: string, search: string) => str?.endsWith?.(search) || false,
+    // Process policy details
+    const coverageDetails = typeof activePolicy.coverageDetails === 'string' 
+      ? JSON.parse(activePolicy.coverageDetails)
+      : activePolicy.coverageDetails;
 
-      // Dates for signatures
-      representative_signature_date: formatDate(new Date()),
-      policyholder_signature_date: formatDate(new Date())
+    const premiumDetails = typeof activePolicy.premiumDetails === 'string'
+      ? JSON.parse(activePolicy.premiumDetails)
+      : activePolicy.premiumDetails;
+
+    // Create complete document variables
+    const documentVariables = {
+      // Client Information
+      full_name: client.fullName,
+      email_address: client.email,
+      phone_number: client.phoneNumber,
+      date_of_birth: formatDate(client.dateOfBirth),
+      
+      // Address Information
+      address: defaultAddress?.street || '',
+      city_state_zip: defaultAddress 
+        ? `${defaultAddress.city}, ${defaultAddress.state} ${defaultAddress.zipCode}`
+        : '',
+
+      // Policy Information
+      policy_number: activePolicy.policyNumber,
+      policy_type: activePolicy.type,
+      issue_date: formatDate(activePolicy.issueDate),
+      effective_date: formatDate(activePolicy.effectiveDate),
+      expiration_date: formatDate(activePolicy.expirationDate),
+      status: activePolicy.status,
+
+      // Coverage Details
+      coverage_limit: formatCurrency(coverageDetails.limit),
+      deductible: formatCurrency(coverageDetails.deductible),
+      coverage_description: coverageDetails.description,
+
+      // Premium Details
+      annual_premium: formatCurrency(premiumDetails.annualPremium),
+      payment_frequency: premiumDetails.paymentFrequency,
+      next_payment_due: formatDate(premiumDetails.nextPaymentDue),
+      discount_amount: formatCurrency(premiumDetails.discount),
+
+      // Type-specific details
+      ...(activePolicy.type === 'auto' && coverageDetails.vehicleInfo ? {
+        vehicle_make: coverageDetails.vehicleInfo.make,
+        vehicle_model: coverageDetails.vehicleInfo.model,
+        vehicle_year: coverageDetails.vehicleInfo.year,
+        vehicle_vin: coverageDetails.vehicleInfo.vin
+      } : {}),
+
+      ...(activePolicy.type === 'home' && coverageDetails.propertyInfo ? {
+        property_construction_year: coverageDetails.propertyInfo.constructionYear,
+        property_square_feet: coverageDetails.propertyInfo.squareFeet,
+        property_construction_type: coverageDetails.propertyInfo.constructionType
+      } : {}),
+
+      ...(activePolicy.type === 'life' ? {
+        term_length: coverageDetails.termLength
+      } : {}),
+
+      // Document metadata
+      generated_date: formatDate(new Date()),
+      generated_by: 'System'
     };
 
-    // Read and process template
+    // Generate document using template
     const templatePath = path.join(process.cwd(), 'uploads', 'templates', template.filePath);
     const templateContent = await fs.readFile(templatePath);
     const zip = new PizZip(templateContent);
 
-    // Configure document generator
     const doc = new Docxtemplater(zip, {
       paragraphLoop: true,
       linebreaks: true,
       parser: angularParser
     });
 
-    // Render document
-    doc.render(processedVariables);
+    doc.render(documentVariables);
 
-    // Generate buffer
-    const buffer = doc.getZip().generate({
-      type: 'nodebuffer',
-      compression: 'DEFLATE'
-    });
-
-    // Create filename and save
+    // Save the generated document
+    const buffer = doc.getZip().generate({ type: 'nodebuffer' });
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const fileName = `${template.name}-${timestamp}.docx`;
+    const fileName = `${client.fullName}-${template.name}-${timestamp}.docx`.replace(/\s+/g, '-');
     const filePath = path.join(process.cwd(), 'uploads', 'documents', fileName);
 
-    await fs.mkdir(path.join(process.cwd(), 'uploads', 'documents'), { recursive: true });
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, buffer);
 
-    // Create database record
+    // Create document record
     const document = await prisma.document.create({
       data: {
         name: fileName,
         filePath: fileName,
         templateId,
         clientId,
-        data: processedVariables
+        data: documentVariables
       }
     });
 
