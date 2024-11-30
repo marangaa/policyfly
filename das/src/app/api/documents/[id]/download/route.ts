@@ -1,51 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { promises as fs } from "fs";
-import path from "path";
+import { DocumentService } from "@/services/document.service";
+import { AppError } from "@/lib/errors";
 
-class DocumentNotFoundError extends Error {
-  constructor(id: string) {
-    super(`Document with id ${id} not found`);
-  }
-}
-
-async function getDocument(id: string) {
-  const document = await prisma.document.findUnique({
-    where: { id },
-  });
-  
-  if (!document) {
-    throw new DocumentNotFoundError(id);
-  }
-  
-  return document;
-}
-
-async function getDocumentBuffer(filePath: string) {
-  const fullPath = path.join(process.cwd(), "uploads", "documents", filePath);
-  return await fs.readFile(fullPath);
-}
-
-// Updated type signature for Next.js App Router
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const document = await getDocument(params.id);
-    const buffer = await getDocumentBuffer(document.filePath);
+    const { buffer, filename } = await DocumentService.downloadDocument(params.id);
 
     return new NextResponse(buffer, {
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "Content-Disposition": `attachment; filename="${document.name}"`,
+        "Content-Disposition": `attachment; filename="${filename}"`,
       },
     });
   } catch (error) {
     console.error("Document download error:", error);
     
-    if (error instanceof DocumentNotFoundError) {
-      return NextResponse.json({ error: error.message }, { status: 404 });
+    if (error instanceof AppError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
     }
     
     return NextResponse.json(
