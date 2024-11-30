@@ -29,11 +29,10 @@ async function getDocumentBuffer(filePath: string) {
 // Updated type signature for Next.js App Router
 export async function GET(
   request: NextRequest,
-  { params }: { params: Record<string, string | string[]> }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const id = params.id as string;
-    const document = await getDocument(id);
+    const document = await getDocument(params.id);
     const buffer = await getDocumentBuffer(document.filePath);
 
     return new NextResponse(buffer, {
