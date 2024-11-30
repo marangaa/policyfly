@@ -40,12 +40,14 @@ interface Policy {
   id: string;
   policyNumber: string;
   type: string;
+  issueDate: string;
   effectiveDate: string;
   expirationDate: string;
+  status: string;
   coverageDetails: {
-    description?: string;
-    limit?: string;
-    deductible?: string;
+    limit: string;
+    deductible: string;
+    description: string;
     vehicleInfo?: {
       make: string;
       model: string;
@@ -59,30 +61,26 @@ interface Policy {
     };
     termLength?: string;
   };
-  status: string;
-  premiumDetails?: {
+  premiumDetails: {
     annualPremium: number;
     paymentFrequency: string;
+    nextPaymentDue: string;
+    discount: number;
   };
 }
 
 interface ClientDetails {
   client: Client;
+  hasPolicies: boolean;
   defaultAddress?: Address;
-  activePolicy?: Policy & {
-    issueDate: string;
-  };
+  policies?: Policy[];
+  policyTypes?: string[];
   recentDocuments?: Array<{
     id: string;
     name: string;
     createdAt: string;
     templateId: string;
   }>;
-  signatureDates: {
-    representative: string;
-    policyholder: string;
-  };
-  defaultTerms: string;
 }
 
 interface DocumentGenerationFormProps {
@@ -175,7 +173,10 @@ export function DocumentGenerationForm({
   // Get fields based on policy type
   const getFieldsForPolicyType = () => {
     const policyFields = selectedPolicyType ? POLICY_TYPE_FIELDS[selectedPolicyType as keyof typeof POLICY_TYPE_FIELDS] : [];
-    return [...COMMON_FIELDS, ...policyFields];
+    return [
+      ...COMMON_FIELDS,
+      ...policyFields
+    ];
   };
 
   // Format currency input
@@ -281,58 +282,47 @@ export function DocumentGenerationForm({
 
       const data: ClientDetails = await response.json();
       
-      // Ensure all date fields are properly formatted
-      const formatDateStr = (dateStr: string | null | undefined) => 
-        dateStr ? new Date(dateStr).toISOString().split('T')[0] : '';
+      if (!data.hasPolicies) {
+        toast.error('No active policies found for this client');
+        setSelectedClient(null);
+        setFormData({});
+        setAvailablePolicyTypes([]);
+        return;
+      }
 
-      // Extract coverage details based on policy type
-      const coverageDetails = data.activePolicy?.coverageDetails || {};
-      const policyType = data.activePolicy?.type?.toLowerCase() || '';
-
-      // Create mapped data with proper type checking
       const mappedData: Record<string, string> = {
-        full_name: data.client.fullName || '',
-        email_address: data.client.email || '',
-        phone_number: data.client.phoneNumber || '',
-        date_of_birth: formatDateStr(data.client.dateOfBirth),
-        address: data.defaultAddress?.street || '',
-        city_state_zip: data.defaultAddress
-          ? `${data.defaultAddress.city}, ${data.defaultAddress.state} ${data.defaultAddress.zipCode}`
-          : '',
-        policy_number: data.activePolicy?.policyNumber || '',
-        policy_type: policyType,
-        issue_date: formatDateStr(data.activePolicy?.issueDate),
-        effective_date: formatDateStr(data.activePolicy?.effectiveDate),
-        expiration_date: formatDateStr(data.activePolicy?.expirationDate),
-        
-        // Handle specific policy type fields
-        ...(policyType === 'auto' && {
-          'coverageDetails.vehicleInfo.make': coverageDetails.vehicleInfo?.make || '',
-          'coverageDetails.vehicleInfo.model': coverageDetails.vehicleInfo?.model || '',
-          'coverageDetails.vehicleInfo.year': coverageDetails.vehicleInfo?.year?.toString() || '',
-          'coverageDetails.vehicleInfo.vin': coverageDetails.vehicleInfo?.vin || '',
-        }),
-        
-        ...(policyType === 'home' && {
-          'coverageDetails.propertyInfo.constructionYear': coverageDetails.propertyInfo?.constructionYear?.toString() || '',
-          'coverageDetails.propertyInfo.squareFeet': coverageDetails.propertyInfo?.squareFeet?.toString() || '',
-          'coverageDetails.propertyInfo.constructionType': coverageDetails.propertyInfo?.constructionType || '',
-        }),
-
-        coverage_limit: coverageDetails.limit || '',
-        deductible_amount: coverageDetails.deductible || '',
+        full_name: data.client.fullName,
+        email_address: data.client.email,
+        phone_number: data.client.phoneNumber,
+        date_of_birth: data.client.dateOfBirth,
       };
 
-      setFormData(mappedData);
-      setSelectedPolicyType(policyType);
-      toast.success('Form auto-filled with client data');
-      const policyTypes = [...new Set(data.activePolicy ? [data.activePolicy.type.toLowerCase()] : [])];
-      setAvailablePolicyTypes(policyTypes);
-
-      // If there's only one policy type, auto-select it
-      if (policyTypes.length === 1) {
-        setSelectedPolicyType(policyTypes[0]);
+      if (data.defaultAddress) {
+        mappedData.address = data.defaultAddress.street;
+        mappedData.city_state_zip = 
+          `${data.defaultAddress.city}, ${data.defaultAddress.state} ${data.defaultAddress.zipCode}`;
       }
+
+      if (data.policyTypes?.length) {
+        setAvailablePolicyTypes(data.policyTypes);
+        
+        if (data.policyTypes.length === 1 && data.policies?.[0]) {
+          const policy = data.policies[0];
+          setSelectedPolicyType(policy.type);
+          
+          Object.assign(mappedData, {
+            policy_number: policy.policyNumber,
+            issue_date: policy.issueDate,
+            effective_date: policy.effectiveDate,
+            expiration_date: policy.expirationDate,
+            status: policy.status,
+            ...generatePolicySpecificFields(policy)
+          });
+        }
+      }
+
+      setFormData(mappedData);
+      toast.success('Form auto-filled with client data');
     } catch (error) {
       console.error('Auto-fill error:', error);
       toast.error('Failed to auto-fill form');
@@ -341,14 +331,54 @@ export function DocumentGenerationForm({
     }
   };
 
+  // Helper function to generate policy-specific fields
+  const generatePolicySpecificFields = (policy: Policy): Record<string, string> => {
+    const fields: Record<string, string> = {};
+    
+    if (policy.premiumDetails) {
+      fields['premiumDetails.annualPremium'] = policy.premiumDetails.annualPremium.toString();
+      fields['premiumDetails.paymentFrequency'] = policy.premiumDetails.paymentFrequency;
+    }
+
+    if (policy.coverageDetails) {
+      const { coverageDetails } = policy;
+      
+      // Add coverage limit and deductible
+      fields['coverage_limit'] = coverageDetails.limit || '';
+      fields['deductible_amount'] = coverageDetails.deductible || '';
+      
+      if (policy.type === 'auto' && coverageDetails.vehicleInfo) {
+        Object.entries(coverageDetails.vehicleInfo).forEach(([key, value]) => {
+          fields[`coverageDetails.vehicleInfo.${key}`] = value.toString();
+        });
+      }
+      
+      if (policy.type === 'home' && coverageDetails.propertyInfo) {
+        Object.entries(coverageDetails.propertyInfo).forEach(([key, value]) => {
+          fields[`coverageDetails.propertyInfo.${key}`] = value.toString();
+        });
+      }
+      
+      if (policy.type === 'life' && 'termLength' in coverageDetails) {
+        fields['coverageDetails.termLength'] = coverageDetails.termLength;
+      }
+    }
+
+    return fields;
+  };
+
   // Form submission handler
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedTemplate) return;
+    if (!selectedTemplate) {
+      toast.error('Please select a template');
+      return;
+    }
 
     // Validate required fields
     const errors: Record<string, string> = {};
     const requiredFields = getFieldsForPolicyType();
+    
     requiredFields.forEach((field) => {
       if (!formData[field.key]?.trim()) {
         errors[field.key] = 'This field is required';
@@ -373,9 +403,11 @@ export function DocumentGenerationForm({
         }),
       });
 
-      if (!response.ok) throw new Error('Failed to generate document');
-
       const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate document');
+      }
 
       // Handle document download
       const downloadResponse = await fetch(data.downloadUrl);
@@ -393,7 +425,7 @@ export function DocumentGenerationForm({
       router.push('/documents');
     } catch (error) {
       console.error('Generation error:', error);
-      toast.error('Failed to generate document');
+      toast.error(error instanceof Error ? error.message : 'Failed to generate document');
     } finally {
       setIsGenerating(false);
     }
@@ -412,7 +444,7 @@ export function DocumentGenerationForm({
     // If no client is selected, show all policy types
     const policyTypes = selectedClient 
       ? availablePolicyTypes
-      : ['auto', 'home', 'life'];
+      : Object.keys(POLICY_TYPE_FIELDS);
 
     if (policyTypes.length === 0) {
       return (

@@ -21,13 +21,12 @@ export async function GET(
         },
         policies: {
           where: { 
-            // Convert to uppercase to match schema
             status: { in: ['ACTIVE', 'active'] }
           },
-          orderBy: {
-            effectiveDate: "desc",
-          },
-          take: 1,
+          orderBy: [
+            { type: 'asc' },
+            { effectiveDate: 'desc' }
+          ],
         },
         documents: {
           orderBy: { createdAt: "desc" },
@@ -42,15 +41,37 @@ export async function GET(
       },
     });
 
-    if (!client) {
-      return NextResponse.json(
-        { error: "Client not found" }, 
-        { status: 404 }
-      );
+    if (!client || client.policies.length === 0) {
+      return NextResponse.json({
+        client: {
+          id: client?.id,
+          fullName: client?.fullName,
+          email: client?.email,
+          phoneNumber: client?.phoneNumber,
+          dateOfBirth: client?.dateOfBirth?.toISOString().split('T')[0] || '',
+        },
+        hasPolicies: false,
+        message: "No active policies found"
+      });
     }
 
-    // Get active policy with properly formatted dates
-    const activePolicy = client.policies[0];
+    // Process policies and ensure proper data format
+    const processedPolicies = client.policies.map(policy => ({
+      id: policy.id,
+      policyNumber: policy.policyNumber,
+      type: policy.type.toLowerCase(),
+      status: policy.status.toLowerCase(),
+      issueDate: policy.issueDate.toISOString().split('T')[0],
+      effectiveDate: policy.effectiveDate.toISOString().split('T')[0],
+      expirationDate: policy.expirationDate.toISOString().split('T')[0],
+      coverageDetails: typeof policy.coverageDetails === 'string'
+        ? JSON.parse(policy.coverageDetails)
+        : policy.coverageDetails,
+      premiumDetails: typeof policy.premiumDetails === 'string'
+        ? JSON.parse(policy.premiumDetails)
+        : policy.premiumDetails,
+    }));
+
     const today = new Date();
 
     // Format the response with complete data mapping
@@ -62,28 +83,11 @@ export async function GET(
         phoneNumber: client.phoneNumber,
         dateOfBirth: client.dateOfBirth?.toISOString().split('T')[0] || '',
       },
+      hasPolicies: true,
       defaultAddress: client.addresses[0] || null,
-      activePolicy: activePolicy ? {
-        id: activePolicy.id,
-        policyNumber: activePolicy.policyNumber,
-        type: activePolicy.type.toLowerCase(), // Normalize type for form
-        status: activePolicy.status.toLowerCase(), // Normalize status for form
-        issueDate: activePolicy.issueDate?.toISOString().split('T')[0] || '',
-        effectiveDate: activePolicy.effectiveDate?.toISOString().split('T')[0] || '',
-        expirationDate: activePolicy.expirationDate?.toISOString().split('T')[0] || '',
-        coverageDetails: typeof activePolicy.coverageDetails === 'string' 
-          ? JSON.parse(activePolicy.coverageDetails)
-          : activePolicy.coverageDetails,
-        premiumDetails: typeof activePolicy.premiumDetails === 'string'
-          ? JSON.parse(activePolicy.premiumDetails)
-          : activePolicy.premiumDetails
-      } : null,
+      policies: processedPolicies,
+      policyTypes: [...new Set(processedPolicies.map(p => p.type))],
       recentDocuments: client.documents,
-      signatureDates: {
-        representative: today.toISOString().split("T")[0],
-        policyholder: today.toISOString().split("T")[0],
-      },
-      defaultTerms: `Standard terms and conditions apply to this ${client.policies[0]?.type || ""} insurance policy. The policyholder agrees to all terms and conditions set forth in this document.`,
     });
   } catch (error) {
     console.error("Client details error:", error);

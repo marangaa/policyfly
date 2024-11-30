@@ -56,20 +56,37 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { templateId, clientId, variables } = body;
 
-    // Validate the request
-    if (!templateId || !variables) {
+    // Enhanced validation
+    if (!templateId) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Template ID is required' },
         { status: 400 }
       );
     }
 
-    // Fetch complete data from database with enhanced policy information
-    const [template, client] = await Promise.all([
-      prisma.template.findUnique({
-        where: { id: templateId }
-      }).then(template => template ? { ...template, variables: template.variables as string[] } : null),
-      clientId ? prisma.client.findUnique({
+    if (!variables || Object.keys(variables).length === 0) {
+      return NextResponse.json(
+        { error: 'Document variables are required' },
+        { status: 400 }
+      );
+    }
+
+    // Fetch template first to validate
+    const template = await prisma.template.findUnique({
+      where: { id: templateId }
+    });
+
+    if (!template) {
+      return NextResponse.json(
+        { error: 'Template not found' },
+        { status: 404 }
+      );
+    }
+
+    // Fetch client if provided
+    let client = null;
+    if (clientId) {
+      client = await prisma.client.findUnique({
         where: { id: clientId },
         include: {
           addresses: {
@@ -84,22 +101,14 @@ export async function POST(request: Request) {
             ]
           }
         }
-      }) : null
-    ]);
+      });
 
-    if (!template) {
-      return NextResponse.json(
-        { error: 'Template not found' },
-        { status: 404 }
-      );
-    }
-
-    // Validate variables against template requirements
-    if (!validateVariables(variables, template)) {
-      return NextResponse.json(
-        { error: 'Missing required template variables' },
-        { status: 400 }
-      );
+      if (!client) {
+        return NextResponse.json(
+          { error: 'Client not found' },
+          { status: 404 }
+        );
+      }
     }
 
     // Process variables for document generation
