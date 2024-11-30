@@ -43,7 +43,7 @@ function formatDate(date: Date | string | null): string {
   })
 }
 
-function validateVariables(variables: any, template: any): boolean {
+function validateVariables(variables: Record<string, string | number | boolean>, template: { variables: string[] }): boolean {
   const requiredFields = template.variables as string[];
   return requiredFields.every(field => {
     const value = variables[field];
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     const [template, client] = await Promise.all([
       prisma.template.findUnique({
         where: { id: templateId }
-      }),
+      }).then(template => template ? { ...template, variables: template.variables as string[] } : null),
       clientId ? prisma.client.findUnique({
         where: { id: clientId },
         include: {
