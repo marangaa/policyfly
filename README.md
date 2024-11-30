@@ -53,6 +53,7 @@ Building dynamic form generation based on detected variables gave me a deep appr
 ## 🚀 Moving Forward
 
 <div style="background: linear-gradient(135deg, #EDE9FE 0%, #DDD6FE 100%); padding: 20px; border-radius: 10px; margin-top: 20px;">
+still a WIP will add various workflows.
 I'm excited to bring these insights to a professional setting and continue growing in this field with its unique challenges.
 maximizing shareholder value 😁
 </div>
