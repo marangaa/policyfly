@@ -45,9 +45,20 @@ export async function POST(request: Request) {
     await ensureDirectoryExists(uploadDir);
 
     // Combine sections into template content
-    const templateContent = validatedData.sections
-      .map((section) => section.content)
-      .join("\n\n");
+    interface Section {
+        content: string;
+    }
+
+    interface ValidatedData {
+        name: string;
+        description?: string;
+        category?: string;
+        sections: Section[];
+    }
+
+    const templateContent: string = (validatedData as ValidatedData).sections
+        .map((section: Section) => section.content)
+        .join("\n\n");
 
     // Extract variables
     const variables = extractTemplateVariables(templateContent);

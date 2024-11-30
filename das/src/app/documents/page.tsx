@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { DocumentsTable } from "./documents-table";
 import Link from "next/link";
-import { Plus, FileText } from "lucide-react"; // Import icons for enhanced visual elements
+import { Plus, FileText } from "lucide-react"; 
 
 export default async function DocumentsPage({
   searchParams,

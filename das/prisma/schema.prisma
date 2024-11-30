@@ -59,6 +59,7 @@ model Address {
   updatedAt DateTime @updatedAt
 }
 
+
 model Policy {
   id              String   @id @default(cuid())
   policyNumber    String   @unique
@@ -67,9 +68,15 @@ model Policy {
   effectiveDate   DateTime 
   expirationDate  DateTime 
   coverageDetails Json     
+  premiumDetails  Json     
   status          String   
   client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
   clientId        String
+  underwritingStatus String?  
+  lastReviewDate    DateTime?
+  renewalStatus     String?   
+  claimHistory      Json?     
+  
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }

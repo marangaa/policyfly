@@ -1,4 +1,5 @@
 // prisma/seed.ts
+
 const { PrismaClient } = require('@prisma/client')
 const { faker } = require('@faker-js/faker')
 
@@ -17,7 +18,12 @@ function generatePolicyNumber(type) {
   return `${prefix}-${year}-${random}`
 }
 
-// Different types of insurance policies with detailed coverage information
+// Helper function to generate VIN number
+function generateVIN() {
+  return faker.vehicle.vin()
+}
+
+// Enhanced policy type definitions with rich data
 const POLICY_TYPES = {
   auto: {
     name: 'auto',
@@ -27,7 +33,26 @@ const POLICY_TYPES = {
       'Standard Auto Insurance with Liability Protection'
     ],
     limits: ['$50,000', '$100,000', '$250,000', '$500,000'],
-    deductibles: ['$500', '$1,000', '$2,500']
+    deductibles: ['$500', '$1,000', '$2,500'],
+    additionalCoverages: [
+      'Roadside Assistance',
+      'Rental Car Coverage',
+      'Gap Insurance',
+      'Personal Injury Protection'
+    ],
+    vehicles: [
+      { make: 'Toyota', model: 'Camry', yearRange: [2018, 2024] },
+      { make: 'Honda', model: 'CR-V', yearRange: [2019, 2024] },
+      { make: 'Ford', model: 'F-150', yearRange: [2017, 2024] },
+      { make: 'Tesla', model: 'Model 3', yearRange: [2020, 2024] }
+    ],
+    discounts: [
+      'Safe Driver',
+      'Multi-Car',
+      'Anti-Theft Device',
+      'Good Student',
+      'Defensive Driving Course'
+    ]
   },
   home: {
     name: 'home',
@@ -37,7 +62,33 @@ const POLICY_TYPES = {
       'Basic Homeowners Insurance with Liability Coverage'
     ],
     limits: ['$200,000', '$350,000', '$500,000', '$1,000,000'],
-    deductibles: ['$1,000', '$2,500', '$5,000']
+    deductibles: ['$1,000', '$2,500', '$5,000'],
+    propertyTypes: [
+      'Single Family Home',
+      'Townhouse',
+      'Condominium',
+      'Multi-Family Home'
+    ],
+    constructionTypes: [
+      'Wood Frame',
+      'Masonry',
+      'Steel Frame',
+      'Concrete'
+    ],
+    securityFeatures: [
+      'Security System',
+      'Fire Sprinklers',
+      'Smoke Detectors',
+      'Deadbolt Locks',
+      'Security Cameras'
+    ],
+    discounts: [
+      'Security System',
+      'Fire Safety',
+      'New Home',
+      'Bundle Discount',
+      'Claims Free'
+    ]
   },
   life: {
     name: 'life',
@@ -47,29 +98,122 @@ const POLICY_TYPES = {
       'Universal Life Insurance with Flexible Premiums'
     ],
     limits: ['$100,000', '$250,000', '$500,000', '$1,000,000'],
-    deductibles: ['$0']
+    deductibles: ['$0'],
+    beneficiaryTypes: [
+      'Spouse',
+      'Child',
+      'Parent',
+      'Trust',
+      'Estate'
+    ],
+    discounts: [
+      'Non-Smoker',
+      'Preferred Health',
+      'Bundle Discount'
+    ]
   }
 }
 
-async function clearDatabase() {
-  console.log('Cleaning up existing data...')
-  // Delete data in the correct order to respect foreign key constraints
-  try {
-    // First delete tables with foreign keys
-    await prisma.$executeRaw`TRUNCATE TABLE "Document" CASCADE;`
-    await prisma.$executeRaw`TRUNCATE TABLE "Policy" CASCADE;`
-    await prisma.$executeRaw`TRUNCATE TABLE "Address" CASCADE;`
-    // Then delete the parent tables
-    await prisma.$executeRaw`TRUNCATE TABLE "Client" CASCADE;`
-    await prisma.$executeRaw`TRUNCATE TABLE "Template" CASCADE;`
-  } catch {
-    console.log('Some tables might not exist yet, continuing with seeding...')
+// Helper function to generate random premium details
+function generatePremiumDetails(coverageLimit, policyType) {
+  const baseRate = {
+    auto: 0.05,
+    home: 0.003,
+    life: 0.004
+  }[policyType]
+
+  const annualPremium = Math.round(parseFloat(coverageLimit.replace(/[^0-9.]/g, '')) * baseRate)
+  const frequencies = ['monthly', 'quarterly', 'semi-annual', 'annual']
+  const frequency = faker.helpers.arrayElement(frequencies)
+  
+  const nextPaymentDate = faker.date.future()
+  
+  return {
+    annualPremium,
+    paymentFrequency: frequency,
+    nextPaymentDue: nextPaymentDate.toISOString(),
+    discount: Math.round(annualPremium * faker.number.float({ min: 0, max: 0.2 })),
+    paymentHistory: Array.from({ length: faker.number.int({ min: 1, max: 5 }) }, () => ({
+      date: faker.date.past().toISOString(),
+      amount: Math.round(annualPremium / (frequency === 'monthly' ? 12 : frequency === 'quarterly' ? 4 : 2)),
+      status: 'paid'
+    }))
+  }
+}
+
+// Helper function to generate coverage details based on policy type
+function generateCoverageDetails(type, policyTypeData) {
+  switch (type) {
+    case 'auto': {
+      const vehicle = faker.helpers.arrayElement(policyTypeData.vehicles)
+      const year = faker.number.int({ 
+        min: vehicle.yearRange[0], 
+        max: vehicle.yearRange[1] 
+      })
+      
+      return {
+        description: faker.helpers.arrayElement(policyTypeData.descriptions),
+        additionalCoverages: faker.helpers.arrayElements(
+          policyTypeData.additionalCoverages,
+          faker.number.int({ min: 1, max: 3 })
+        ),
+        discounts: faker.helpers.arrayElements(
+          policyTypeData.discounts,
+          faker.number.int({ min: 1, max: 3 })
+        ),
+        vehicleInfo: {
+          make: vehicle.make,
+          model: vehicle.model,
+          year: year,
+          vin: generateVIN()
+        }
+      }
+    }
+    
+    case 'home': {
+      return {
+        description: faker.helpers.arrayElement(policyTypeData.descriptions),
+        propertyInfo: {
+          constructionYear: faker.number.int({ min: 1950, max: 2023 }),
+          squareFeet: faker.number.int({ min: 1000, max: 5000 }),
+          constructionType: faker.helpers.arrayElement(policyTypeData.constructionTypes),
+          securityFeatures: faker.helpers.arrayElements(
+            policyTypeData.securityFeatures,
+            faker.number.int({ min: 2, max: 4 })
+          )
+        },
+        discounts: faker.helpers.arrayElements(
+          policyTypeData.discounts,
+          faker.number.int({ min: 1, max: 3 })
+        )
+      }
+    }
+    
+    case 'life': {
+      return {
+        description: faker.helpers.arrayElement(policyTypeData.descriptions),
+        healthInfo: {
+          smokerStatus: faker.datatype.boolean(),
+          beneficiaries: faker.helpers.arrayElements(
+            policyTypeData.beneficiaryTypes,
+            faker.number.int({ min: 1, max: 3 })
+          ).map(type => ({
+            type,
+            name: faker.person.fullName()
+          }))
+        }
+      }
+    }
   }
 }
 
 async function main() {
-  // Clear existing data
-  await clearDatabase()
+  // First, clear existing data
+  console.log('Cleaning up existing data...')
+  await prisma.$executeRaw`TRUNCATE TABLE "Document" CASCADE;`
+  await prisma.$executeRaw`TRUNCATE TABLE "Policy" CASCADE;`
+  await prisma.$executeRaw`TRUNCATE TABLE "Address" CASCADE;`
+  await prisma.$executeRaw`TRUNCATE TABLE "Client" CASCADE;`
 
   console.log('Starting to seed the database...')
 
@@ -105,7 +249,7 @@ async function main() {
           state: faker.location.state({ abbreviated: true }),
           zipCode: faker.location.zipCode(),
           type: addressTypes[j],
-          isDefault: j === 0  // First address is default
+          isDefault: j === 0
         }
       })
     }
@@ -127,9 +271,14 @@ async function main() {
         new Date(2023, 0, 1),
         new Date(2024, 11, 31)
       )
-      const effectiveDate = new Date(issueDate) // Coverage starts same day as issue
+      const effectiveDate = new Date(issueDate)
       const expirationDate = new Date(effectiveDate)
-      expirationDate.setFullYear(effectiveDate.getFullYear() + 1) // One year policy
+      expirationDate.setFullYear(effectiveDate.getFullYear() + 1)
+
+      // Select coverage limit and generate other details
+      const coverageLimit = faker.helpers.arrayElement(policyType.limits)
+      const coverageDetails = generateCoverageDetails(policyType.name, policyType)
+      const premiumDetails = generatePremiumDetails(coverageLimit, policyType.name)
 
       await prisma.policy.create({
         data: {
@@ -139,12 +288,21 @@ async function main() {
           issueDate,
           effectiveDate,
           expirationDate,
-          status: faker.helpers.arrayElement(['active', 'active', 'active', 'pending', 'expired']), // Weight towards active
-          coverageDetails: {
-            description: faker.helpers.arrayElement(policyType.descriptions),
-            limit: faker.helpers.arrayElement(policyType.limits),
-            deductible: faker.helpers.arrayElement(policyType.deductibles)
-          }
+          status: faker.helpers.arrayElement(['active', 'active', 'active', 'pending', 'expired']),
+          coverageDetails,
+          premiumDetails,
+          underwritingStatus: faker.helpers.arrayElement(['approved', 'pending_review', 'declined']),
+          lastReviewDate: faker.date.recent(),
+          renewalStatus: faker.helpers.arrayElement(['auto_renewal', 'manual_renewal', 'non_renewable']),
+          claimHistory: Array.from(
+            { length: faker.number.int({ min: 0, max: 3 }) },
+            () => ({
+              date: faker.date.past().toISOString(),
+              type: faker.helpers.arrayElement(['accident', 'theft', 'damage', 'injury']),
+              status: faker.helpers.arrayElement(['pending', 'approved', 'denied']),
+              amount: faker.number.int({ min: 1000, max: 50000 })
+            })
+          )
         }
       })
     }
