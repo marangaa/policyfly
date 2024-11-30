@@ -3,11 +3,11 @@ import { DocumentService } from "@/services/document.service";
 import { AppError } from "@/lib/errors";
 
 export async function GET(
-  _request: NextRequest,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  context: { params: { id: string } }
 ) {
   try {
-    const { buffer, filename } = await DocumentService.downloadDocument(params.id);
+    const { buffer, filename } = await DocumentService.downloadDocument(context.params.id);
 
     return new NextResponse(buffer, {
       headers: {
