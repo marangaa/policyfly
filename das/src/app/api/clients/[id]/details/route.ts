@@ -1,15 +1,15 @@
 import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export async function GET(
-    request: NextRequest,
-    context: { params: { id: string } }
-  ) {
-    try {
-      const clientId = context.params.id;
+export async function GET(request: NextRequest) {
+  try {
+    const id = request.url.split('/').pop();
+    if (!id) {
+      return NextResponse.json({ error: "Invalid client ID" }, { status: 400 });
+    }
 
     const client = await prisma.client.findUnique({
-      where: { id: clientId },
+      where: { id },
       include: {
         addresses: {
           where: { isDefault: true },
