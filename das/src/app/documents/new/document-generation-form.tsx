@@ -19,7 +19,6 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-// Type definitions
 interface Client {
   id: string;
   fullName: string;
@@ -28,13 +27,6 @@ interface Client {
   dateOfBirth: string;
 }
 
-interface Address {
-  street: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  isDefault: boolean;
-}
 
 interface Policy {
   id: string;
@@ -69,19 +61,6 @@ interface Policy {
   };
 }
 
-interface ClientDetails {
-  client: Client;
-  hasPolicies: boolean;
-  defaultAddress?: Address;
-  policies?: Policy[];
-  policyTypes?: string[];
-  recentDocuments?: Array<{
-    id: string;
-    name: string;
-    createdAt: string;
-    templateId: string;
-  }>;
-}
 
 interface DocumentGenerationFormProps {
   templates: Template[];
@@ -250,11 +229,22 @@ export function DocumentGenerationForm({
 
     setSearching(true);
     try {
-      const response = await fetch(`/api/clients/search?q=${encodeURIComponent(query)}`);
-      if (!response.ok) throw new Error('Search failed');
+      const response = await fetch(`/api/clients/search?q=${encodeURIComponent(query)}`, {
+        headers: { 'Accept': 'application/json' }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Search response:', response.status, errorText);
+        throw new Error('Search failed');
+      }
 
       const data = await response.json();
-      setClients(data.clients);
+      if (!data.success) {
+        throw new Error(data.error || 'Search failed');
+      }
+
+      setClients(data.data.clients);
     } catch (error) {
       console.error('Search error:', error);
       toast.error('Failed to search clients');
@@ -279,67 +269,90 @@ export function DocumentGenerationForm({
     setSelectedClient(client);
     setSearchQuery(client.fullName);
     setClients([]);
-
+  
     try {
-      const response = await fetch(`/api/clients/${client.id}/details`);
-      if (!response.ok) throw new Error('Failed to fetch client details');
-
-      const data: ClientDetails = await response.json();
-      
-      if (!data.hasPolicies) {
+      const response = await fetch(`/api/clients/${client.id}/details`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache'
+        }
+      });
+  
+      let data;
+      try {
+        const text = await response.text();
+        data = JSON.parse(text);
+        
+        if (!response.ok) {
+          throw new Error(data.error || data.message || 'Failed to fetch client details');
+        }
+      } catch (parseError) {
+        console.error('Response parsing error:', parseError);
+        throw new Error('Invalid server response');
+      }
+  
+      const clientData = data.data;
+      if (!clientData || !clientData.client) {
+        throw new Error('Invalid response format from server');
+      }
+  
+      if (!clientData.hasPolicies) {
         toast.error('No active policies found for this client');
         setSelectedClient(null);
         setFormData({});
         setAvailablePolicyTypes([]);
         return;
       }
-
-      const defaultPolicy = data.policies?.[0];
+  
       const mappedData: Record<string, string> = {
-        full_name: data.client.fullName,
-        email_address: data.client.email,
-        phone_number: data.client.phoneNumber,
-        date_of_birth: new Date(data.client.dateOfBirth).toISOString().split('T')[0], // Fix date format
+        full_name: clientData.client.fullName || '',
+        email_address: clientData.client.email || '',
+        phone_number: clientData.client.phoneNumber || '',
+        date_of_birth: clientData.client.dateOfBirth ? 
+          new Date(clientData.client.dateOfBirth).toISOString().split('T')[0] : ''
       };
-
-      if (data.defaultAddress) {
-        mappedData.address = data.defaultAddress.street;
-        mappedData.city_state_zip = 
-          `${data.defaultAddress.city}, ${data.defaultAddress.state} ${data.defaultAddress.zipCode}`;
+  
+      if (clientData.defaultAddress) {
+        mappedData.address = clientData.defaultAddress.street || '';
+        mappedData.city_state_zip = [
+          clientData.defaultAddress.city,
+          clientData.defaultAddress.state,
+          clientData.defaultAddress.zipCode
+        ].filter(Boolean).join(', ');
       }
-
+  
+      const defaultPolicy = clientData.policies?.[0];
       if (defaultPolicy) {
-        const coverageDetails = typeof defaultPolicy.coverageDetails === 'string'
-          ? JSON.parse(defaultPolicy.coverageDetails)
-          : defaultPolicy.coverageDetails;
-
-        const premiumDetails = typeof defaultPolicy.premiumDetails === 'string'
-          ? JSON.parse(defaultPolicy.premiumDetails)
-          : defaultPolicy.premiumDetails;
-
         Object.assign(mappedData, {
-          policy_number: defaultPolicy.policyNumber,
-          policy_status: defaultPolicy.status.toUpperCase(),
-          issue_date: new Date(defaultPolicy.issueDate).toISOString().split('T')[0], // Fix date format
-          effective_date: new Date(defaultPolicy.effectiveDate).toISOString().split('T')[0], // Fix date format
-          expiration_date: new Date(defaultPolicy.expirationDate).toISOString().split('T')[0], // Fix date format
-          annual_premium: premiumDetails.annualPremium?.toString() || '',
-          payment_frequency: premiumDetails.paymentFrequency || '',
-          liability_coverage: coverageDetails.limit?.toString() || '',
-          collision_deductible: coverageDetails.deductible?.toString() || '',
+          policy_number: defaultPolicy.policyNumber || '',
+          policy_status: defaultPolicy.status?.toUpperCase() || '',
+          issue_date: defaultPolicy.issueDate ? 
+            new Date(defaultPolicy.issueDate).toISOString().split('T')[0] : '',
+          effective_date: defaultPolicy.effectiveDate ? 
+            new Date(defaultPolicy.effectiveDate).toISOString().split('T')[0] : '',
+          expiration_date: defaultPolicy.expirationDate ? 
+            new Date(defaultPolicy.expirationDate).toISOString().split('T')[0] : '',
+          annual_premium: defaultPolicy.premiumDetails?.annualPremium?.toString() || '',
+          payment_frequency: defaultPolicy.premiumDetails?.paymentFrequency || '',
+          liability_coverage: defaultPolicy.coverageDetails?.limit?.toString() || '',
+          collision_deductible: defaultPolicy.coverageDetails?.deductible?.toString() || ''
         });
       }
-
-      setAvailablePolicyTypes(data.policyTypes || []);
+  
+      setAvailablePolicyTypes(clientData.policyTypes || []);
       setFormData(mappedData);
       toast.success('Form auto-filled with client data');
+      
     } catch (error) {
       console.error('Auto-fill error:', error);
-      toast.error('Failed to auto-fill form');
+      toast.error(error instanceof Error ? error.message : 'Failed to fetch client details');
+      setSelectedClient(null);
       setFormData({});
       setAvailablePolicyTypes([]);
     }
   };
+  
 
   // Form submission handler
   const handleSubmit = async (e: React.FormEvent) => {

@@ -1,28 +1,32 @@
-import { DocumentGenerationForm } from './document-generation-form'
-import { prisma } from '@/lib/prisma'
+import { prisma } from '@/lib/prisma';
+import { DocumentGenerationForm } from './document-generation-form';
+import { Template } from '@prisma/client';
 
-export default async function NewDocumentPage({
-  searchParams,
-}: {
-  searchParams: { [key: string]: string | string[] | undefined }
-}) {
+interface PageProps {
+  searchParams: { [key: string]: string | string[] | undefined };
+}
+
+export default async function NewDocumentPage({ searchParams }: PageProps) {
+  // Get all templates ordered by name
   const templates = await prisma.template.findMany({
     orderBy: { name: 'asc' }
-  })
+  });
 
-  let initialTemplate = null
-  const templateId = searchParams?.template as string | undefined;
+  let initialTemplate: Template | null = null;
+  const templateId = typeof searchParams?.template === 'string' ? searchParams.template : undefined;
 
   if (templateId) {
     initialTemplate = await prisma.template.findUnique({
       where: { id: templateId }
-    })
+    });
   }
 
   return (
-    <DocumentGenerationForm 
-      templates={templates} 
-      initialTemplate={initialTemplate}
-    />
-  )
+    <main>
+      <DocumentGenerationForm 
+        templates={templates} 
+        initialTemplate={initialTemplate}
+      />
+    </main>
+  );
 }

@@ -1,4 +1,3 @@
-// app/api/clients/search/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
@@ -8,10 +7,13 @@ export async function GET(request: NextRequest) {
     const query = searchParams.get("q");
 
     if (!query || query.length < 2) {
-      return NextResponse.json({ clients: [] });
+      return NextResponse.json({ 
+        success: true,
+        data: { clients: [] }
+      });
     }
 
-    // Search for clients with matching name, email, or policy number
+    // Fetch clients with active policies
     const clients = await prisma.client.findMany({
       where: {
         OR: [
@@ -27,42 +29,56 @@ export async function GET(request: NextRequest) {
         ],
       },
       include: {
+        addresses: {
+          where: { isDefault: true },
+          take: 1
+        },
         policies: {
-          where: { status: { in: ['ACTIVE', 'active'] } },
+          where: { 
+            status: { in: ['ACTIVE', 'active'] }
+          },
           select: {
             id: true,
             policyNumber: true,
             type: true,
+            status: true,
+            coverageDetails: true,
+            premiumDetails: true
           }
         }
       },
-      take: 5, // Limit results to prevent overwhelming the UI
+      take: 5,
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json({ 
-      clients: clients.map(client => ({
-        id: client.id,
-        fullName: client.fullName,
-        email: client.email,
-        phoneNumber: client.phoneNumber,
-        dateOfBirth: client.dateOfBirth.toISOString(),
-        activePolicies: client.policies
+    const processedClients = clients.map(client => ({
+      id: client.id,
+      fullName: client.fullName,
+      email: client.email,
+      phoneNumber: client.phoneNumber,
+      dateOfBirth: client.dateOfBirth.toISOString(),
+      defaultAddress: client.addresses[0] || null,
+      activePolicies: client.policies.map(policy => ({
+        ...policy,
+        coverageDetails: typeof policy.coverageDetails === 'string' 
+          ? JSON.parse(policy.coverageDetails) 
+          : policy.coverageDetails,
+        premiumDetails: typeof policy.premiumDetails === 'string'
+          ? JSON.parse(policy.premiumDetails)
+          : policy.premiumDetails
       }))
+    }));
+
+    return NextResponse.json({
+      success: true,
+      data: { clients: processedClients }
     });
   } catch (error) {
     console.error("Client search error:", error);
-    
-    if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
-      );
-    }
-    
-    return NextResponse.json(
-      { error: "Failed to search clients" },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      success: false,
+      error: "Failed to search clients",
+      message: error instanceof Error ? error.message : "Unknown error"
+    }, { status: 500 });
   }
 }

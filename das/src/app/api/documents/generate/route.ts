@@ -107,14 +107,30 @@ export async function POST(request: Request) {
       ? JSON.parse(activePolicy.premiumDetails)
       : activePolicy.premiumDetails;
 
+    const claimsHistory = typeof activePolicy.claimsHistory === 'string'
+      ? JSON.parse(activePolicy.claimsHistory)
+      : activePolicy.claimsHistory;
+
     // Create complete document variables
     const documentVariables = {
       // Basic Policy Information
       policy_number: activePolicy.policyNumber,
+      policy_type: activePolicy.type,
+      package_type: activePolicy.packageType,
+      payment_status: activePolicy.paymentStatus,
       issue_date: formatDate(activePolicy.issueDate),
       effective_date: formatDate(activePolicy.effectiveDate),
       expiration_date: formatDate(activePolicy.expirationDate),
       policy_status: activePolicy.status.toUpperCase(),
+      underwriting_status: activePolicy.underwritingStatus,
+      renewal_status: activePolicy.renewalStatus,
+
+      // Claims Information
+      total_claims: claimsHistory?.totalClaims || 0,
+      open_claims: claimsHistory?.openClaims || 0,
+      last_claim_date: claimsHistory?.lastClaimDate 
+        ? formatDate(claimsHistory.lastClaimDate) 
+        : 'No Claims',
 
       // Policyholder Information
       policyholder_name: client.fullName,

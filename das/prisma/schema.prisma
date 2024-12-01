@@ -59,24 +59,29 @@ model Address {
   updatedAt DateTime @updatedAt
 }
 
-
 model Policy {
-  id              String   @id @default(cuid())
-  policyNumber    String   @unique
-  type            String   
-  issueDate       DateTime 
-  effectiveDate   DateTime 
-  expirationDate  DateTime 
-  coverageDetails Json      // Strictly typed through application code
-  premiumDetails  Json      // Strictly typed through application code
+  id              String    @id @default(cuid())
+  policyNumber    String    @unique
+  type            String    @default("auto")
+  issueDate       DateTime  
+  effectiveDate   DateTime  
+  expirationDate  DateTime  
+  coverageDetails Json      @default("{}")
+  premiumDetails  Json      @default("{}")
   status          String    @default("active")
-  client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client          Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
   clientId        String
-  underwritingStatus String?  
+  underwritingStatus String?   @default("pending")
   lastReviewDate    DateTime?
-  renewalStatus     String?   
-  claimHistory      Json?     
+  renewalStatus     String?    @default("pending")
+  claimsHistory     Json?      @default("{}")
+  packageType       String?    @default("standard")
+  paymentStatus     String?    @default("current")
   
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([clientId])
+  @@index([type])
+  @@index([status])
 }

@@ -1,5 +1,3 @@
-// prisma/seed.ts
-
 const { PrismaClient } = require('@prisma/client')
 const { faker } = require('@faker-js/faker')
 
@@ -310,9 +308,6 @@ function generateCoverageDetails(type: keyof typeof POLICY_TYPES, policyTypeData
         termLength: faker.helpers.arrayElement(['10 Years', '20 Years', '30 Years'])
       } as LifeCoverageDetails;
     }
-    
-    default:
-      throw new Error(`Unsupported policy type: ${type}`);
   }
 }
 
@@ -381,6 +376,8 @@ async function main() {
       const expirationDate = new Date(effectiveDate);
       expirationDate.setFullYear(effectiveDate.getFullYear() + 1);
 
+      const selectedPackage = faker.helpers.arrayElement(POLICY_VARIATIONS[type].packages);
+
       await prisma.policy.create({
         data: {
           clientId: client.id,
@@ -390,11 +387,19 @@ async function main() {
           effectiveDate,
           expirationDate,
           status: faker.helpers.arrayElement(['active', 'ACTIVE']),
-          coverageDetails,
-          premiumDetails: generatePremiumDetails(limit, type),
+          coverageDetails: JSON.stringify(coverageDetails),  // Stringify JSON fields
+          premiumDetails: JSON.stringify(generatePremiumDetails(limit, type)),  // Stringify JSON fields
           underwritingStatus: 'approved',
           lastReviewDate: faker.date.recent(),
-          renewalStatus: 'auto_renewal'
+          renewalStatus: 'auto_renewal',
+          claimsHistory: JSON.stringify({  // Stringify JSON fields
+            claims: [],
+            totalClaims: 0,
+            lastClaimDate: null,
+            riskScore: faker.number.int({ min: 50, max: 100 })
+          }),
+          packageType: selectedPackage.name.toLowerCase(),
+          paymentStatus: faker.helpers.arrayElement(['current', 'past_due', 'paid_in_full'])
         }
       });
     }
